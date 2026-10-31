@@ -418,3 +418,125 @@ model AndroidNotification {
   @@index([dismissed])
   @@map("android_notifications")
 }
+
+// Phase 4.2: Prompt Management & Versioning
+model PromptTemplate {
+  id              String   @id @default(cuid())
+  workspaceId     String   @map("workspace_id") @db.Uuid
+  name            String
+  operation       String   // classify, summarize, extract, suggest
+  description     String?
+  category        String?  // work, personal, health, etc
+  tags            String[] @default([])
+  isActive        Boolean  @default(true) @map("is_active")
+  
+  // Relationships
+  versions        PromptVersion[]
+  abTests         ABTest[]
+  metrics         PromptMetric[]
+  
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  // Constraints
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@index([operation])
+  @@map("prompt_templates")
+}
+
+model PromptVersion {
+  id              String   @id @default(cuid())
+  templateId      String   @map("template_id")
+  template        PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  // Version info
+  version         Int      // 1, 2, 3, ...
+  content         String   // The actual prompt
+  variables       String[] @default([]) // {taskTitle}, {description}, etc
+  
+  // Testing & Status
+  isActive        Boolean  @default(false) @map("is_active")
+  description     String?
+  changelog       String?
+  author          String?
+  
+  // Relationships
+  abTestsAsControl    ABTest[] @relation("control")
+  abTestsAsTreatment  ABTest[] @relation("treatment")
+  metrics         PromptMetric[]
+  
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@map("prompt_versions")
+}
+
+model ABTest {
+  id                  String   @id @default(cuid())
+  templateId          String   @map("template_id")
+  template            PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  // Versions being tested
+  controlVersionId    String   @map("control_version_id")
+  controlVersion      PromptVersion @relation("control", fields: [controlVersionId], references: [id], onDelete: Cascade)
+  
+  treatmentVersionId  String   @map("treatment_version_id")
+  treatmentVersion    PromptVersion @relation("treatment", fields: [treatmentVersionId], references: [id], onDelete: Cascade)
+  
+  // Test status
+  status              String   @default("running") // running, completed, winner_selected
+  winner              String?  // "control" or "treatment"
+  
+  // Config
+  sampleSize          Int?     @map("sample_size")
+  startDate           DateTime @default(now()) @map("start_date") @db.Timestamptz(6)
+  endDate             DateTime? @map("end_date") @db.Timestamptz(6)
+  
+  // Relationships
+  metrics             PromptMetric[]
+  
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  @@index([templateId])
+  @@index([status])
+  @@map("ab_tests")
+}
+
+model PromptMetric {
+  id              String   @id @default(cuid())
+  templateId      String   @map("template_id")
+  template        PromptTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  
+  versionId       String   @map("version_id")
+  version         PromptVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  
+  abTestId        String?  @map("ab_test_id")
+  abTest          ABTest?  @relation(fields: [abTestId], references: [id], onDelete: SetNull)
+  
+  // Performance metrics
+  operation       String   // classify, summarize, etc
+  success         Boolean
+  accuracy        Float?   // 0-1 confidence
+  latencyMs       Int      @map("latency_ms")
+  tokenCount      Int      @map("token_count")
+  costUsd         Float    @map("cost_usd")
+  
+  // Quality metrics
+  userRating      Int?     @map("user_rating") // 1-5 stars
+  relevance       Float?   // AI-scored relevance
+  
+  // Context
+  taskId          String?  @map("task_id")
+  userId          String?  @map("user_id")
+  
+  recordedAt      DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  
+  @@index([templateId])
+  @@index([versionId])
+  @@index([abTestId])
+  @@index([recordedAt])
+  @@map("prompt_metrics")
+}
