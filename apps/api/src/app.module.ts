@@ -5,6 +5,7 @@ import { HealthModule } from './health/health.module'
 import { PrismaModule } from './prisma/prisma.module'
 import { TasksModule } from './tasks/tasks.module'
 import { RemindersModule } from './reminders/reminders.module'
+import { IntegrationsModule } from './integrations/integrations.module'
 
 @Module({
   imports: [
@@ -13,6 +14,7 @@ import { RemindersModule } from './reminders/reminders.module'
     HealthModule,
     TasksModule,
     RemindersModule,
+    IntegrationsModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

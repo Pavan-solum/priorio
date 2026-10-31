@@ -63,6 +63,9 @@ model Workspace {
   notes       Note[]
   embeddings  Embedding[]
   auditLogs   AuditLog[]
+  oauthConnections OAuthConnection[]
+  gmailSyncs  GmailSync[]
+  androidNotifications AndroidNotification[]
 
   @@map("workspaces")
 }
@@ -356,4 +359,62 @@ model AuditLog {
 
   @@index([workspaceId, createdAt])
   @@map("audit_logs")
+}
+
+model OAuthConnection {
+  id            String    @id @default(uuid()) @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
+  provider      String
+  userId        String    @map("user_id")
+  accessToken   String    @map("access_token")
+  refreshToken  String?   @map("refresh_token")
+  expiresAt     DateTime? @map("expires_at") @db.Timestamptz(6)
+  scopes        String[]
+  connectedAt   DateTime  @default(now()) @map("connected_at") @db.Timestamptz(6)
+  lastSyncAt    DateTime? @map("last_sync_at") @db.Timestamptz(6)
+  revokedAt     DateTime? @map("revoked_at") @db.Timestamptz(6)
+  metadata      Json?
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, provider])
+  @@index([revokedAt])
+  @@map("oauth_connections")
+}
+
+model GmailSync {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  historyId      String    @map("history_id")
+  lastSyncAt     DateTime  @default(now()) @map("last_sync_at") @db.Timestamptz(6)
+  totalEmails    Int       @default(0) @map("total_emails")
+  tasksCreated   Int       @default(0) @map("tasks_created")
+  lastError      String?   @map("last_error")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId])
+  @@index([lastSyncAt])
+  @@map("gmail_syncs")
+}
+
+model AndroidNotification {
+  id        String    @id @default(uuid()) @db.Uuid
+  workspaceId String  @map("workspace_id") @db.Uuid
+  userId    String    @map("user_id")
+  title     String
+  body      String
+  appPackage String  @map("app_package")
+  timestamp DateTime
+  taskId    String?   @map("task_id") @db.Uuid
+  dismissed Boolean   @default(false)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task      Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, userId])
+  @@index([dismissed])
+  @@map("android_notifications")
 }
