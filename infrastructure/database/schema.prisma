@@ -197,6 +197,7 @@ model User {
   auditLogs   AuditLog[]
   conversations Conversation[]
   dailyPlans  DailyPlan[]
+  externalIntegrations ExternalIntegration[]
 
   @@map("users")
 }
@@ -231,6 +232,7 @@ model Workspace {
   conversations Conversation[]
   dailyPlans  DailyPlan[]
   retentionPolicies RetentionPolicy[]
+  externalIntegrations ExternalIntegration[]
 
   @@map("workspaces")
 }
@@ -364,6 +366,7 @@ model Task {
   createdBy       User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
   sourceMessage   Message?   @relation(fields: [sourceMessageId], references: [id], onDelete: SetNull)
   subtasks        Subtask[]
+  providerTasks   ProviderTask[]
 
   @@index([workspaceId, status, dueAt])
   @@index([createdById, status])
@@ -862,6 +865,43 @@ enum ConflictResolutionStrategy {
   KEEP_REMOTE
 }
 
+// Phase 7: Additional Integrations enums
+enum IntegrationStatus {
+  CONNECTED
+  DISCONNECTED
+  ERROR
+  SYNC_IN_PROGRESS
+  NEEDS_REAUTH
+}
+
+enum PermissionType {
+  READ_MESSAGES
+  WRITE_MESSAGES
+  MANAGE_CALENDAR
+  READ_CALENDAR
+  CREATE_TASKS
+  MANAGE_TASKS
+  READ_PROFILE
+  SYNC_CHATS
+  SYNC_EMAILS
+  SYNC_CALENDAR
+}
+
+enum PermissionStatus {
+  REQUESTED
+  GRANTED
+  DENIED
+  REVOKED
+  EXPIRED
+}
+
+enum WebhookStatus {
+  ACTIVE
+  INACTIVE
+  FAILED
+  EXPIRED
+}
+
 model DeviceInfo {
   id              String          @id @default(uuid()) @db.Uuid
   userId          String          @map("user_id") @db.Uuid
@@ -981,4 +1021,178 @@ model SyncConflict {
   @@index([workspaceId, resolvedAt])
   @@index([itemType, itemId])
   @@map("sync_conflicts")
+}
+
+// ===== PHASE 7: ADDITIONAL INTEGRATIONS =====
+
+// ExternalIntegration: Provider account connections
+model ExternalIntegration {
+  id                String                    @id @default(uuid()) @db.Uuid
+  workspaceId       String                    @map("workspace_id") @db.Uuid
+  userId            String                    @map("user_id") @db.Uuid
+  provider          String                    // teams, outlook, calendar, github, microsoft, google
+  displayName       String                    @map("display_name")
+  externalAccountId String                    @map("external_account_id")
+  externalEmail     String?                   @map("external_email")
+  status            IntegrationStatus         @default(DISCONNECTED)
+  lastSyncedAt      DateTime?                 @map("last_synced_at") @db.Timestamptz(6)
+  nextSyncAt        DateTime?                 @map("next_sync_at") @db.Timestamptz(6)
+  syncFrequency     Int                       @default(3600) @map("sync_frequency") // seconds
+  metadata          Json                      @default("{}")
+  createdAt         DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace         Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions       IntegrationPermission[]
+  syncLogs          IntegrationSyncLog[]
+  tasks             ProviderTask[]
+  events            ProviderEvent[]
+  notifications     ProviderNotification[]
+  apiUsage          ProviderAPIUsage[]
+  
+  @@unique([workspaceId, userId, provider, externalAccountId])
+  @@index([workspaceId, status])
+  @@index([userId, provider])
+  @@index([nextSyncAt])
+  @@map("external_integrations")
+}
+
+// IntegrationPermission: Granular permissions for each integration
+model IntegrationPermission {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  permission        PermissionType
+  scope             String              // email, calendar, chats, messages, tasks, etc
+  status            PermissionStatus    @default(REQUESTED)
+  grantedAt         DateTime?           @map("granted_at") @db.Timestamptz(6)
+  revokedAt         DateTime?           @map("revoked_at") @db.Timestamptz(6)
+  expiresAt         DateTime?           @map("expires_at") @db.Timestamptz(6)
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, permission, scope])
+  @@index([integrationId, status])
+  @@index([expiresAt])
+  @@map("integration_permissions")
+}
+
+// IntegrationSyncLog: Track all sync operations
+model IntegrationSyncLog {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  syncType          String              // full, incremental, chats, emails, events
+  status            SyncStatus          @default(PENDING)
+  itemsProcessed    Int                 @default(0) @map("items_processed")
+  itemsSucceeded    Int                 @default(0) @map("items_succeeded")
+  itemsFailed       Int                 @default(0) @map("items_failed")
+  conflictCount     Int                 @default(0) @map("conflict_count")
+  startedAt         DateTime            @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt       DateTime?           @map("completed_at") @db.Timestamptz(6)
+  durationMs        Int?                @map("duration_ms")
+  errorMessage      String?             @map("error_message") @db.Text
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@index([integrationId, createdAt])
+  @@index([status, startedAt])
+  @@map("integration_sync_logs")
+}
+
+// ProviderTask: Mapping between local tasks and provider tasks
+model ProviderTask {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  taskId            String              @map("task_id") @db.Uuid
+  externalTaskId    String              @map("external_task_id")
+  provider          String
+  externalStatus    String              @map("external_status")
+  lastSyncedAt      DateTime?           @map("last_synced_at") @db.Timestamptz(6)
+  syncDirection     String              @default("bidirectional") @map("sync_direction") // bidirectional, one-way-to, one-way-from
+  conflictData      Json?               @map("conflict_data")
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  task              Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, externalTaskId])
+  @@unique([taskId, integrationId])
+  @@index([integrationId, lastSyncedAt])
+  @@map("provider_tasks")
+}
+
+// ProviderEvent: External events from providers
+model ProviderEvent {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  externalEventId   String              @map("external_event_id")
+  type              String              // meeting, reminder, task-update, chat-message
+  title             String?
+  description       String?             @db.Text
+  startTime         DateTime?           @map("start_time") @db.Timestamptz(6)
+  endTime           DateTime?           @map("end_time") @db.Timestamptz(6)
+  organizer         String?
+  attendees         String[]            @default([])
+  location          String?
+  metadata          Json                @default("{}")
+  processedAt       DateTime?           @map("processed_at") @db.Timestamptz(6)
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, externalEventId])
+  @@index([integrationId, type])
+  @@index([startTime])
+  @@map("provider_events")
+}
+
+// ProviderNotification: Webhook subscriptions and notifications
+model ProviderNotification {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  webhookId         String              @map("webhook_id")
+  eventType         String              @map("event_type") // message, event-created, task-updated
+  webhookUrl        String              @map("webhook_url") @db.Text
+  subscriptionId    String              @map("subscription_id")
+  expiresAt         DateTime?           @map("expires_at") @db.Timestamptz(6)
+  status            WebhookStatus       @default(ACTIVE)
+  lastTriggeredAt   DateTime?           @map("last_triggered_at") @db.Timestamptz(6)
+  failureCount      Int                 @default(0) @map("failure_count")
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, webhookId, eventType])
+  @@index([integrationId, status])
+  @@index([expiresAt])
+  @@map("provider_notifications")
+}
+
+// ProviderAPIUsage: Track API rate limits and usage
+model ProviderAPIUsage {
+  id                String              @id @default(uuid()) @db.Uuid
+  integrationId     String              @map("integration_id") @db.Uuid
+  date              DateTime            @db.Date
+  requestCount      Int                 @default(0) @map("request_count")
+  limitPerDay       Int                 @default(0) @map("limit_per_day")
+  limitPerMinute    Int                 @default(0) @map("limit_per_minute")
+  resetAt           DateTime            @map("reset_at") @db.Timestamptz(6)
+  metadata          Json                @default("{}")
+  createdAt         DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  integration       ExternalIntegration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  
+  @@unique([integrationId, date])
+  @@index([integrationId, resetAt])
+  @@map("provider_api_usage")
 }
