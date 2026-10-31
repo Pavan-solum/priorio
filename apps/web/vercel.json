@@ -1,0 +1,11 @@
+{
+  "installCommand": "pnpm install --filter @priorio/web...",
+  "buildCommand": "pnpm build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}

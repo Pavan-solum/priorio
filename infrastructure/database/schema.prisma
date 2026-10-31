@@ -1,0 +1,359 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../apps/api/generated/prisma"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+enum Priority {
+  CRITICAL
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SuggestionStatus {
+  PENDING_APPROVAL
+  APPROVED
+  DISMISSED
+}
+
+model User {
+  id          String            @id @default(uuid()) @db.Uuid
+  email       String            @unique
+  displayName String            @map("display_name")
+  timezone    String            @default("UTC")
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships WorkspaceMember[]
+  devices     Device[]
+  tasks       Task[]
+  sessions    AuthSession[]
+  auditLogs   AuditLog[]
+
+  @@map("users")
+}
+
+model Workspace {
+  id          String            @id @default(uuid()) @db.Uuid
+  name        String
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships WorkspaceMember[]
+  devices     Device[]
+  integrations Integration[]
+  messages    Message[]
+  tasks       Task[]
+  reminders   Reminder[]
+  followUps   FollowUp[]
+  notifications Notification[]
+  suggestions Suggestion[]
+  notes       Note[]
+  embeddings  Embedding[]
+  auditLogs   AuditLog[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  role        String    @default("owner")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+model Device {
+  id          String    @id @default(uuid()) @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  platform    String
+  name        String?
+  lastSeenAt  DateTime? @map("last_seen_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  notifications Notification[]
+
+  @@index([workspaceId, userId])
+  @@map("devices")
+}
+
+model Integration {
+  id                String             @id @default(uuid()) @db.Uuid
+  workspaceId       String             @map("workspace_id") @db.Uuid
+  provider          String
+  externalAccountId String?            @map("external_account_id")
+  status            String             @default("disconnected")
+  lastSyncedAt      DateTime?          @map("last_synced_at") @db.Timestamptz(6)
+  createdAt         DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  token             IntegrationToken?
+  messages          Message[]
+
+  @@unique([workspaceId, provider, externalAccountId])
+  @@index([workspaceId, status])
+  @@map("integrations")
+}
+
+model IntegrationToken {
+  id                    String      @id @default(uuid()) @db.Uuid
+  integrationId         String      @unique @map("integration_id") @db.Uuid
+  encryptedAccessToken  Bytes?      @map("encrypted_access_token")
+  encryptedRefreshToken Bytes?      @map("encrypted_refresh_token")
+  expiresAt             DateTime?   @map("expires_at") @db.Timestamptz(6)
+  keyVersion            Int         @map("key_version")
+  createdAt             DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  integration           Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@map("integration_tokens")
+}
+
+model Message {
+  id          String           @id @default(uuid()) @db.Uuid
+  workspaceId String           @map("workspace_id") @db.Uuid
+  integrationId String          @map("integration_id") @db.Uuid
+  externalId  String           @map("external_id")
+  sender      String
+  subject     String?
+  preview     String
+  content     String?
+  sourceUrl   String?          @map("source_url")
+  receivedAt  DateTime         @map("received_at") @db.Timestamptz(6)
+  readAt      DateTime?        @map("read_at") @db.Timestamptz(6)
+  archivedAt  DateTime?        @map("archived_at") @db.Timestamptz(6)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  integration Integration      @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  analysis    MessageAnalysis?
+  followUps   FollowUp[]
+  suggestions Suggestion[]
+  tasks       Task[]
+  embeddings  Embedding[]
+
+  @@unique([integrationId, externalId])
+  @@index([workspaceId, receivedAt])
+  @@index([workspaceId, archivedAt, receivedAt])
+  @@map("messages")
+}
+
+model MessageAnalysis {
+  id            String   @id @default(uuid()) @db.Uuid
+  messageId     String   @unique @map("message_id") @db.Uuid
+  category      String
+  priority      Priority
+  intent        String
+  summary       String
+  model         String
+  promptVersion String   @map("prompt_version")
+  confidence    Float
+  latencyMs     Int      @map("latency_ms")
+  inputTokens   Int?     @map("input_tokens")
+  outputTokens  Int?     @map("output_tokens")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  message       Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  entities      ExtractedEntity[]
+
+  @@map("message_analysis")
+}
+
+model Task {
+  id              String     @id @default(uuid()) @db.Uuid
+  workspaceId     String     @map("workspace_id") @db.Uuid
+  createdById     String     @map("created_by_id") @db.Uuid
+  sourceMessageId String?    @map("source_message_id") @db.Uuid
+  title           String
+  description     String?
+  dueAt           DateTime?  @map("due_at") @db.Timestamptz(6)
+  timezone        String?
+  priority        Priority   @default(MEDIUM)
+  status          TaskStatus @default(PENDING)
+  completedAt     DateTime?  @map("completed_at") @db.Timestamptz(6)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy       User       @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  sourceMessage   Message?   @relation(fields: [sourceMessageId], references: [id], onDelete: SetNull)
+  subtasks        Subtask[]
+
+  @@index([workspaceId, status, dueAt])
+  @@index([createdById, status])
+  @@map("tasks")
+}
+
+model Subtask {
+  id          String   @id @default(uuid()) @db.Uuid
+  taskId      String   @map("task_id") @db.Uuid
+  title       String
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("subtasks")
+}
+
+model Reminder {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  title       String
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
+  timezone    String?
+  recurrence  String?
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, scheduledAt, completedAt])
+  @@map("reminders")
+}
+
+model FollowUp {
+  id                  String    @id @default(uuid()) @db.Uuid
+  workspaceId         String    @map("workspace_id") @db.Uuid
+  sourceMessageId     String    @map("source_message_id") @db.Uuid
+  expectedResponseAt  DateTime? @map("expected_response_at") @db.Timestamptz(6)
+  status              String    @default("pending")
+  draft               String?
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace           Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceMessage       Message   @relation(fields: [sourceMessageId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, sourceMessageId])
+  @@index([workspaceId, status, expectedResponseAt])
+  @@map("follow_ups")
+}
+
+model Notification {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  deviceId    String?   @map("device_id") @db.Uuid
+  dedupeKey   String    @map("dedupe_key")
+  title       String
+  body        String
+  scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
+  deliveredAt DateTime? @map("delivered_at") @db.Timestamptz(6)
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  device      Device?   @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, scheduledAt, deliveredAt])
+  @@map("notifications")
+}
+
+model Suggestion {
+  id              String           @id @default(uuid()) @db.Uuid
+  workspaceId     String           @map("workspace_id") @db.Uuid
+  sourceMessageId String           @map("source_message_id") @db.Uuid
+  action          Json
+  confidence      Float
+  explanation     String
+  status          SuggestionStatus @default(PENDING_APPROVAL)
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sourceMessage   Message          @relation(fields: [sourceMessageId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status, createdAt])
+  @@map("suggestions")
+}
+
+model Note {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  title       String
+  content     String
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  embeddings  Embedding[]
+
+  @@index([workspaceId, updatedAt])
+  @@map("notes")
+}
+
+model ExtractedEntity {
+  id                String          @id @default(uuid()) @db.Uuid
+  analysisId        String          @map("analysis_id") @db.Uuid
+  entityType        String          @map("entity_type")
+  value             String
+  normalizedDate    DateTime?       @map("normalized_date") @db.Timestamptz(6)
+  confidence        Float
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  analysis          MessageAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+
+  @@index([analysisId, entityType])
+  @@map("extracted_entities")
+}
+
+model Embedding {
+  id          String                  @id @default(uuid()) @db.Uuid
+  workspaceId String                  @map("workspace_id") @db.Uuid
+  messageId   String?                 @map("message_id") @db.Uuid
+  noteId      String?                 @map("note_id") @db.Uuid
+  contentHash String                  @map("content_hash")
+  model       String
+  vector      Unsupported("vector(1536)") @map("embedding")
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  message     Message?                @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  note        Note?                   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, contentHash, model])
+  @@index([workspaceId])
+  @@map("embeddings")
+}
+
+model AuthSession {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  refreshHash  String    @unique @map("refresh_hash")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt    DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@map("auth_sessions")
+}
+
+model AuditLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  actorId     String?   @map("actor_id") @db.Uuid
+  action      String
+  objectType  String    @map("object_type")
+  objectId    String?   @map("object_id") @db.Uuid
+  metadata    Json?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  actor       User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, createdAt])
+  @@map("audit_logs")
+}

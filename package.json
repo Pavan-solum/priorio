@@ -1,0 +1,15 @@
+{
+  "name": "priorio",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.34.9",
+  "scripts": {
+    "dev": "pnpm --filter @priorio/web dev",
+    "api:dev": "pnpm --filter @priorio/api start:dev",
+    "build": "pnpm --filter @priorio/web build",
+    "typecheck": "pnpm --filter @priorio/web typecheck && pnpm --filter @priorio/api typecheck"
+  },
+  "devDependencies": {
+    "@prisma/client": "^6.3.1"
+  }
+}
