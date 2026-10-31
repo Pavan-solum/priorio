@@ -78,6 +78,22 @@ docker run -d -p 6379:6379 redis:7-alpine
   - Known issues and blockers
   - Health metrics
 
+- [PHASE_3_2_IMPLEMENTATION.md](./PHASE_3_2_IMPLEMENTATION.md) - Gmail & Android implementation guide (13KB)
+  - Gmail sync service architecture
+  - Email parsing and deduplication
+  - Sync checkpoint mechanism
+  - Android notifications system
+  - API endpoint documentation
+  - Testing procedures
+
+- [PHASE_3_4_TESTING.md](./PHASE_3_4_TESTING.md) - Testing & documentation guide (15KB)
+  - 70+ comprehensive test cases
+  - Test coverage by component
+  - Running tests instructions
+  - Mock patterns and examples
+  - Security test coverage
+  - Jest configuration
+
 - [PHASE_3_QUICKSTART.md](./PHASE_3_QUICKSTART.md) - Quick start guide (9KB)
   - Google OAuth setup instructions
   - Environment variable configuration
