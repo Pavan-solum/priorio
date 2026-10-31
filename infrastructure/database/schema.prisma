@@ -10,6 +10,158 @@ datasource db {
   extensions = [vector]
 }
 
+// ===== PHASE 6: INTELLIGENCE MODELS =====
+
+// Knowledge base entries with vector embeddings
+model Knowledge {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @map("workspace_id") @db.Uuid
+  title           String
+  content         String            @db.Text
+  category        String            @default("general")
+  tags            String[]          @default([])
+  source          String?           // URL, document name, etc.
+  vectorEmbeddingId String?         @map("vector_embedding_id") @db.Uuid
+  isArchived      Boolean           @default(false) @map("is_archived")
+  accessCount     Int               @default(0) @map("access_count")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  vectorEmbedding KnowledgeVector?  @relation(fields: [vectorEmbeddingId], references: [id], onDelete: SetNull)
+  citations       CitedSource[]
+  
+  @@index([workspaceId, category])
+  @@index([workspaceId, createdAt])
+  @@index([isArchived])
+  @@map("knowledge")
+}
+
+// Vector embeddings for knowledge entries
+model KnowledgeVector {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @map("workspace_id") @db.Uuid
+  knowledgeId     String            @map("knowledge_id") @db.Uuid
+  embedding       Unsupported("vector(1536)") @map("embedding")
+  model           String            @default("text-embedding-3-small")
+  metadata        Json              @default("{}")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  knowledge       Knowledge[]
+  
+  @@unique([workspaceId, knowledgeId])
+  @@index([workspaceId])
+  @@map("knowledge_vectors")
+}
+
+// Chat conversations with AI assistant
+model Conversation {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @map("workspace_id") @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  title           String            @default("New Conversation")
+  summary         String?           @db.Text
+  messageCount    Int               @default(0) @map("message_count")
+  lastMessageAt   DateTime?         @map("last_message_at") @db.Timestamptz(6)
+  isArchived      Boolean           @default(false) @map("is_archived")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        ConversationMessage[]
+  
+  @@index([workspaceId, userId])
+  @@index([createdAt])
+  @@index([isArchived])
+  @@map("conversations")
+}
+
+// Individual messages in a conversation
+model ConversationMessage {
+  id              String            @id @default(uuid()) @db.Uuid
+  conversationId  String            @map("conversation_id") @db.Uuid
+  role            String            // "user" or "assistant"
+  content         String            @db.Text
+  sources         CitedSource[]
+  metadata        Json              @default("{}")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  conversation    Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  @@index([conversationId, createdAt])
+  @@map("conversation_messages")
+}
+
+// Sources cited in assistant responses
+model CitedSource {
+  id              String            @id @default(uuid()) @db.Uuid
+  messageId       String            @map("message_id") @db.Uuid
+  knowledgeId     String?           @map("knowledge_id") @db.Uuid
+  title           String
+  url             String?
+  content         String?           @db.Text
+  relevanceScore  Float             @map("relevance_score")
+  position        Int               // Position in the message
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  message         ConversationMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  knowledge       Knowledge?        @relation(fields: [knowledgeId], references: [id], onDelete: SetNull)
+  
+  @@index([messageId])
+  @@index([knowledgeId])
+  @@map("cited_sources")
+}
+
+// Daily optimized task plans
+model DailyPlan {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @map("workspace_id") @db.Uuid
+  userId          String            @map("user_id") @db.Uuid
+  planDate        DateTime          @map("plan_date") @db.Date
+  taskIds         String[]          @default([]) @map("task_ids")
+  timeBlocks      Json              @default("[]") @map("time_blocks") // Array of time blocks
+  breaks          Json              @default("[]") // Break suggestions
+  metrics         Json              @default("{}")  // Productivity metrics
+  completionScore Float?            @map("completion_score") // 0-100
+  isExecuted      Boolean           @default(false) @map("is_executed")
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, planDate])
+  @@index([workspaceId, planDate])
+  @@index([userId, planDate])
+  @@map("daily_plans")
+}
+
+// Data retention/deletion policies
+model RetentionPolicy {
+  id              String            @id @default(uuid()) @db.Uuid
+  workspaceId     String            @map("workspace_id") @db.Uuid
+  name            String
+  description     String?           @db.Text
+  dataType        String            // conversations, knowledge, messages, etc.
+  retentionDays   Int               @map("retention_days")
+  archiveOldData  Boolean           @default(true) @map("archive_old_data")
+  autoExecute     Boolean           @default(true) @map("auto_execute")
+  isActive        Boolean           @default(true) @map("is_active")
+  lastExecutedAt  DateTime?         @map("last_executed_at") @db.Timestamptz(6)
+  nextExecuteAt   DateTime?         @map("next_execute_at") @db.Timestamptz(6)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@index([workspaceId, dataType])
+  @@index([workspaceId, isActive])
+  @@map("retention_policies")
+}
+
 enum Priority {
   CRITICAL
   HIGH
@@ -43,6 +195,8 @@ model User {
   tasks       Task[]
   sessions    AuthSession[]
   auditLogs   AuditLog[]
+  conversations Conversation[]
+  dailyPlans  DailyPlan[]
 
   @@map("users")
 }
@@ -72,6 +226,11 @@ model Workspace {
   offlineTasks OfflineTask[]
   syncQueue   SyncQueueItem[]
   syncConflicts SyncConflict[]
+  knowledge   Knowledge[]
+  knowledgeVectors KnowledgeVector[]
+  conversations Conversation[]
+  dailyPlans  DailyPlan[]
+  retentionPolicies RetentionPolicy[]
 
   @@map("workspaces")
 }
