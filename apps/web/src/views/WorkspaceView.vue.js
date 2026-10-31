@@ -1008,6 +1008,11 @@ else if (__VLS_ctx.activeSection === 'inbox') {
         ...{ class: "inbox-list" },
     });
     for (const [message] of __VLS_getVForSourceType((__VLS_ctx.inboxMessages))) {
+        __VLS_asFunctionalElement(__VLS_intrinsicElements.article, __VLS_intrinsicElements.article)({
+            key: (message.id),
+            ...{ class: "inbox-row" },
+            ...{ class: ({ 'inbox-row-selected': __VLS_ctx.selectedMessageId === message.id, 'inbox-row-unread': !message.read }) },
+        });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.button, __VLS_intrinsicElements.button)({
             ...{ onClick: (...[$event]) => {
                     if (!!(__VLS_ctx.activeSection === 'today'))
@@ -1016,9 +1021,7 @@ else if (__VLS_ctx.activeSection === 'inbox') {
                         return;
                     __VLS_ctx.openMessage(message);
                 } },
-            key: (message.id),
-            ...{ class: "inbox-row" },
-            ...{ class: ({ 'inbox-row-selected': __VLS_ctx.selectedMessageId === message.id, 'inbox-row-unread': !message.read }) },
+            ...{ class: "inbox-row-open" },
             type: "button",
         });
         __VLS_asFunctionalElement(__VLS_intrinsicElements.span, __VLS_intrinsicElements.span)({
@@ -2451,6 +2454,7 @@ if (__VLS_ctx.taskDialogOpen) {
 /** @type {__VLS_StyleScopedClasses['inbox-row']} */ ;
 /** @type {__VLS_StyleScopedClasses['inbox-row-selected']} */ ;
 /** @type {__VLS_StyleScopedClasses['inbox-row-unread']} */ ;
+/** @type {__VLS_StyleScopedClasses['inbox-row-open']} */ ;
 /** @type {__VLS_StyleScopedClasses['sender-avatar']} */ ;
 /** @type {__VLS_StyleScopedClasses['inbox-row-main']} */ ;
 /** @type {__VLS_StyleScopedClasses['inbox-row-top']} */ ;
