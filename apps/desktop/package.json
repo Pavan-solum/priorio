@@ -1,0 +1,31 @@
+{
+  "name": "priorio-desktop",
+  "version": "1.0.0",
+  "description": "Priorio - Personal Task Management Desktop App",
+  "type": "module",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "build:release": "tauri build --release",
+    "preview": "vite preview",
+    "type-check": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^1.5.3",
+    "@tauri-apps/cli": "^1.5.14",
+    "axios": "^1.6.0",
+    "crypto-js": "^4.1.1",
+    "date-fns": "^2.30.0",
+    "electron-store": "^8.1.0",
+    "pinia": "^2.1.6",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^4.5.0",
+    "@vue/test-utils": "^2.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.7",
+    "vue-tsc": "^1.8.22"
+  }
+}

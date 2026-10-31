@@ -39,6 +39,7 @@ model User {
   updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   memberships WorkspaceMember[]
   devices     Device[]
+  deviceInfos DeviceInfo[]
   tasks       Task[]
   sessions    AuthSession[]
   auditLogs   AuditLog[]
@@ -53,6 +54,7 @@ model Workspace {
   updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
   memberships WorkspaceMember[]
   devices     Device[]
+  deviceInfos DeviceInfo[]
   integrations Integration[]
   messages    Message[]
   tasks       Task[]
@@ -66,6 +68,10 @@ model Workspace {
   oauthConnections OAuthConnection[]
   gmailSyncs  GmailSync[]
   androidNotifications AndroidNotification[]
+  syncLogs    DeviceSyncLog[]
+  offlineTasks OfflineTask[]
+  syncQueue   SyncQueueItem[]
+  syncConflicts SyncConflict[]
 
   @@map("workspaces")
 }
@@ -669,4 +675,151 @@ model ClassificationMetric {
   @@index([classifierId])
   @@index([recordedAt])
   @@map("classification_metrics")
+}
+
+// ============================================================================
+// PHASE 5: CROSS-PLATFORM MODELS
+// ============================================================================
+
+enum SyncStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  MACOS
+  WINDOWS
+  WEB
+}
+
+enum ConflictResolutionStrategy {
+  LAST_WRITE_WINS
+  MANUAL_RESOLUTION
+  KEEP_LOCAL
+  KEEP_REMOTE
+}
+
+model DeviceInfo {
+  id              String          @id @default(uuid()) @db.Uuid
+  userId          String          @map("user_id") @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  platform        DevicePlatform
+  osVersion       String          @map("os_version")
+  appVersion      String          @map("app_version")
+  deviceName      String?         @map("device_name")
+  deviceId        String          @unique @map("device_id")
+  capabilities    Json            @default("{}") // Storage limit, sync frequency, etc
+  syncStatus      SyncStatus      @default(PENDING)
+  lastSyncAt      DateTime?       @map("last_sync_at") @db.Timestamptz(6)
+  lastActivityAt  DateTime?       @map("last_activity_at") @db.Timestamptz(6)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  syncLogs        DeviceSyncLog[]
+  offlineTasks    OfflineTask[]
+  syncQueue       SyncQueueItem[]
+  
+  @@index([workspaceId, userId])
+  @@index([syncStatus])
+  @@index([lastSyncAt])
+  @@map("device_info")
+}
+
+model DeviceSyncLog {
+  id              String          @id @default(uuid()) @db.Uuid
+  deviceId        String          @map("device_id") @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  syncStatus      SyncStatus
+  itemsProcessed  Int             @default(0) @map("items_processed")
+  itemsFailed     Int             @default(0) @map("items_failed")
+  conflictsFound  Int             @default(0) @map("conflicts_found")
+  duration        Int?            @map("duration_ms") // milliseconds
+  errorMessage    String?         @map("error_message")
+  metadata        Json            @default("{}") // Additional sync details
+  startedAt       DateTime        @default(now()) @map("started_at") @db.Timestamptz(6)
+  completedAt     DateTime?       @map("completed_at") @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  device          DeviceInfo      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@index([deviceId, createdAt])
+  @@index([workspaceId, syncStatus])
+  @@index([startedAt])
+  @@map("device_sync_logs")
+}
+
+model OfflineTask {
+  id              String          @id @default(uuid()) @db.Uuid
+  deviceId        String          @map("device_id") @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  taskId          String?         @map("task_id") @db.Uuid
+  operation       String          // CREATE, UPDATE, DELETE
+  taskData        Json                              // Snapshot of task data
+  syncedAt        DateTime?       @map("synced_at") @db.Timestamptz(6)
+  syncAttempts    Int             @default(0) @map("sync_attempts")
+  lastSyncError   String?         @map("last_sync_error")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  device          DeviceInfo      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@index([deviceId, syncedAt])
+  @@index([workspaceId, syncedAt])
+  @@index([createdAt])
+  @@map("offline_tasks")
+}
+
+model SyncQueueItem {
+  id              String          @id @default(uuid()) @db.Uuid
+  deviceId        String          @map("device_id") @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  itemType        String          // task, reminder, note, etc
+  itemId          String          @map("item_id") @db.Uuid
+  operation       String          // CREATE, UPDATE, DELETE
+  priority        Priority        @default(MEDIUM)
+  status          SyncStatus      @default(PENDING)
+  payload         Json            // Operation data
+  processedAt     DateTime?       @map("processed_at") @db.Timestamptz(6)
+  errorMessage    String?         @map("error_message")
+  retryCount      Int             @default(0) @map("retry_count")
+  maxRetries      Int             @default(3) @map("max_retries")
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  device          DeviceInfo      @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@index([workspaceId, status, priority])
+  @@index([deviceId, status])
+  @@index([createdAt])
+  @@map("sync_queue_items")
+}
+
+model SyncConflict {
+  id              String          @id @default(uuid()) @db.Uuid
+  workspaceId     String          @map("workspace_id") @db.Uuid
+  itemType        String          // task, reminder, etc
+  itemId          String          @map("item_id") @db.Uuid
+  localData       Json            @map("local_data")
+  remoteData      Json            @map("remote_data")
+  strategy        ConflictResolutionStrategy @default(LAST_WRITE_WINS)
+  resolution      Json?
+  resolvedAt      DateTime?       @map("resolved_at") @db.Timestamptz(6)
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  workspace       Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  @@index([workspaceId, resolvedAt])
+  @@index([itemType, itemId])
+  @@map("sync_conflicts")
 }

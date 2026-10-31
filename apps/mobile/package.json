@@ -1,0 +1,46 @@
+{
+  "name": "priorio-mobile",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "build:ios": "ionic capacitor build ios",
+    "build:android": "ionic capacitor build android",
+    "sync": "ionic capacitor sync",
+    "open:ios": "ionic capacitor open ios",
+    "open:android": "ionic capacitor open android",
+    "test": "vitest",
+    "test:e2e": "cypress run",
+    "test:e2e:open": "cypress open"
+  },
+  "dependencies": {
+    "vue": "^3.3.4",
+    "vite": "^4.4.6",
+    "@ionic/vue": "^7.3.0",
+    "@ionic/vue-router": "^7.3.0",
+    "@capacitor/core": "^5.3.0",
+    "@capacitor/ios": "^5.3.0",
+    "@capacitor/android": "^5.3.0",
+    "@capacitor/device": "^5.3.0",
+    "@capacitor/storage": "^5.3.0",
+    "@capacitor/push-notifications": "^5.3.0",
+    "@capacitor/network": "^5.3.0",
+    "axios": "^1.5.0",
+    "pinia": "^2.1.5",
+    "vue-router": "^4.2.4",
+    "ionicons": "^7.1.2",
+    "date-fns": "^2.30.0",
+    "uuid": "^9.0.0",
+    "crypto-js": "^4.1.1"
+  },
+  "devDependencies": {
+    "@vue/test-utils": "^2.4.1",
+    "vitest": "^0.34.1",
+    "@types/node": "^20.5.0",
+    "typescript": "^5.1.6",
+    "cypress": "^13.3.0",
+    "@cypress/webpack-dev-server": "^5.0.5"
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "build": {
+    "beforeBuildCommand": "npm run type-check",
+    "beforeDevCommand": "npm run type-check",
+    "devPath": "http://localhost:5173",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Priorio",
+        "width": 1200,
+        "height": 800,
+        "minWidth": 800,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "icon": [
+          "icons/32x32.png",
+          "icons/128x128.png",
+          "icons/128x128@2x.png",
+          "icons/icon.ico"
+        ]
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "tauri": {
+    "allowlist": {
+      "all": true,
+      "notification": {
+        "all": true
+      },
+      "dialog": {
+        "all": true
+      },
+      "fs": {
+        "all": true,
+        "readDir": true,
+        "writeDir": true,
+        "createDir": true,
+        "removeDir": true,
+        "removeFile": true,
+        "renameFile": true,
+        "copyFile": true
+      },
+      "window": {
+        "all": true,
+        "minimize": true,
+        "maximize": true,
+        "toggleDevtools": true
+      },
+      "shell": {
+        "all": true,
+        "open": true
+      },
+      "process": {
+        "all": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "com.priorio.app",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/Png.iconset/icon_16x16.png",
+        "icons/Png.iconset/icon_32x32.png",
+        "icons/Png.iconset/icon_128x128.png",
+        "icons/Png.iconset/icon_256x256.png",
+        "icons/icon.icns"
+      ]
+    }
+  }
+}
