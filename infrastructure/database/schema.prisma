@@ -540,3 +540,133 @@ model PromptMetric {
   @@index([recordedAt])
   @@map("prompt_metrics")
 }
+
+// Phase 4.3: Classification Service
+model ClassificationTaxonomy {
+  id                String   @id @default(cuid())
+  workspaceId       String   @map("workspace_id") @db.Uuid
+  name              String
+  description       String?
+  
+  categories        ClassificationCategory[]
+  classifiers       Classifier[]
+  trainingDatasets  TrainingDataset[]
+  metrics           ClassificationMetric[]
+  
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  @@unique([workspaceId, name])
+  @@index([workspaceId])
+  @@map("classification_taxonomies")
+}
+
+model ClassificationCategory {
+  id                String   @id @default(cuid())
+  taxonomyId        String   @map("taxonomy_id")
+  taxonomy          ClassificationTaxonomy @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+  
+  name              String
+  description       String?
+  rules             String[] @default([])
+  exampleKeywords   String[] @default([])
+  
+  metrics           ClassificationMetric[]
+  
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  @@unique([taxonomyId, name])
+  @@index([taxonomyId])
+  @@map("classification_categories")
+}
+
+model TrainingDataset {
+  id                String   @id @default(cuid())
+  taxonomyId        String   @map("taxonomy_id")
+  taxonomy          ClassificationTaxonomy @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+  
+  version           Int
+  description       String?
+  size              Int      @default(0)
+  
+  trainingExamples  TrainingExample[]
+  classifier        Classifier?
+  
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  @@unique([taxonomyId, version])
+  @@index([taxonomyId])
+  @@map("training_datasets")
+}
+
+model TrainingExample {
+  id                String   @id @default(cuid())
+  datasetId         String   @map("dataset_id")
+  dataset           TrainingDataset @relation(fields: [datasetId], references: [id], onDelete: Cascade)
+  
+  text              String
+  category          String
+  confidence        Float    @default(1.0)
+  
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  
+  @@index([datasetId])
+  @@map("training_examples")
+}
+
+model Classifier {
+  id                String   @id @default(cuid())
+  taxonomyId        String   @map("taxonomy_id")
+  taxonomy          ClassificationTaxonomy @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+  
+  trainingDatasetId String   @map("training_dataset_id")
+  trainingDataset   TrainingDataset @relation(fields: [trainingDatasetId], references: [id], onDelete: Restrict)
+  
+  version           Int
+  modelType         String   @map("model_type") // "prompt", "fine-tuned", "ensemble"
+  metadata          Json     @default("{}")
+  
+  isActive          Boolean  @default(false) @map("is_active")
+  accuracy          Float?
+  
+  metrics           ClassificationMetric[]
+  
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  
+  @@unique([taxonomyId, version])
+  @@index([taxonomyId])
+  @@map("classifiers")
+}
+
+model ClassificationMetric {
+  id                String   @id @default(cuid())
+  taxonomyId        String   @map("taxonomy_id")
+  taxonomy          ClassificationTaxonomy @relation(fields: [taxonomyId], references: [id], onDelete: Cascade)
+  
+  categoryId        String   @map("category_id")
+  category          ClassificationCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  
+  classifierId      String?  @map("classifier_id")
+  classifier        Classifier? @relation(fields: [classifierId], references: [id], onDelete: SetNull)
+  
+  // Confusion matrix
+  truePositives     Int      @default(0) @map("true_positives")
+  falsePositives    Int      @default(0) @map("false_positives")
+  falseNegatives    Int      @default(0) @map("false_negatives")
+  trueNegatives     Int      @default(0) @map("true_negatives")
+  
+  // Calculated metrics
+  precision         Float?
+  recall            Float?
+  f1Score           Float?   @map("f1_score")
+  
+  recordedAt        DateTime @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  
+  @@index([taxonomyId])
+  @@index([classifierId])
+  @@index([recordedAt])
+  @@map("classification_metrics")
+}
