@@ -79,11 +79,6 @@ defineProps<Props>()
 /**
  * Events emitted by component
  */
-defineEmits<{
-  convertTask: []
-  reply: []
-}>()
-
 const emit = defineEmits<{
   convertTask: []
   reply: []

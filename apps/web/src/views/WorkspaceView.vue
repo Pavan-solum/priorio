@@ -4,10 +4,11 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   Archive, ArrowUpRight, Bell, BookOpen, CalendarDays, Check, CheckCircle2,
   ChevronDown, ChevronRight, CircleHelp, Clock3, Command, Filter, Inbox,
-  LayoutDashboard, ListTodo, Mail, Menu, MessageCircle, MoreHorizontal, Plus,
+  LayoutDashboard, ListTodo, Mail, Menu, MessageCircle, MessageSquare, MoreHorizontal, Plus,
   Search, Send, Settings2, ShieldCheck, Sparkles, Star, Tag, X,
 } from 'lucide-vue-next'
 import { useWorkspaceStore, type InboxMessage, type Priority } from '../stores/workspace'
+import CommunicationToolsView from './CommunicationToolsView.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -145,6 +146,15 @@ function navigateTo(name: string) {
           <component :is="item.icon" :size="18" :stroke-width="1.8" />
           <span>{{ item.label }}</span>
           <span v-if="item.count?.value" class="nav-count">{{ item.count.value }}</span>
+        </RouterLink>
+      </nav>
+
+      <div class="nav-label nav-label-spaced">COMMUNICATION</div>
+      <nav class="primary-nav" aria-label="Communication channels">
+        <RouterLink :to="{ name: 'communication-tools' }" class="nav-link" :class="{ 'nav-link-active': activeSection === 'communication-tools' }">
+          <MessageSquare :size="18" :stroke-width="1.8" />
+          <span>Communication Tools</span>
+          <span class="nav-count">7</span>
         </RouterLink>
       </nav>
 
@@ -291,8 +301,24 @@ function navigateTo(name: string) {
           <section class="content-panel knowledge-empty"><span class="knowledge-icon"><BookOpen :size="23" /></span><h2>Your knowledge, in one place</h2><p>Save a message or jot down a note to start building your personal reference space.</p><button class="button-outline" type="button" disabled><Plus :size="16" /> New note unavailable</button><span class="privacy-line"><ShieldCheck :size="14" /> Semantic search is not configured in this preview.</span></section>
         </section>
 
+        <section v-else-if="activeSection === 'communication-tools'" class="inner-page">
+          <CommunicationToolsView />
+        </section>
+
         <section v-else-if="activeSection === 'integrations'" class="inner-page">
           <div class="page-heading"><div><p class="eyebrow">BRING YOUR DAY TOGETHER</p><h1>Integrations<span class="heading-period">.</span></h1><p class="heading-subtitle">Manage the services that keep Priorio up to date.</p></div></div>
+          
+          <div class="comm-banner-card" @click="navigateTo('communication-tools')">
+            <div class="comm-banner-left">
+              <span class="comm-banner-icon"><MessageSquare :size="20" /></span>
+              <div>
+                <strong>Communication Tools Hub</strong>
+                <p>View all 7 communication channels, messaging services, and mail integrations.</p>
+              </div>
+            </div>
+            <button class="button-primary banner-action-btn" type="button">Open Communication Tools →</button>
+          </div>
+
           <div class="integration-notice"><ShieldCheck :size="18" /><p><strong>Connections are not enabled in this build.</strong><span>No credentials are requested or stored by this preview.</span></p></div>
           <div class="integration-grid"><article v-for="integration in [{ name: 'Gmail', detail: 'Email, requests, and important updates', icon: Mail, className: 'gmail-brand' }, { name: 'Microsoft Teams', detail: 'Messages and team commitments', icon: MessageCircle, className: 'teams-brand' }, { name: 'WhatsApp previews', detail: 'Android notification previews only', icon: MessageCircle, className: 'whatsapp-brand' }]" :key="integration.name" class="integration-card"><span class="integration-brand" :class="integration.className"><component :is="integration.icon" :size="19" /></span><span class="integration-status">Not connected</span><h2>{{ integration.name }}</h2><p>{{ integration.detail }}</p><button class="button-outline" type="button" disabled>Unavailable in preview</button></article></div>
           <div class="whatsapp-note"><ShieldCheck :size="17" /><p><strong>WhatsApp privacy</strong><span>Personal WhatsApp support can only use notification previews explicitly enabled on Android. Priorio does not access complete chat history or use WhatsApp Web scraping.</span></p></div>

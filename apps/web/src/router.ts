@@ -9,6 +9,7 @@ const router = createRouter({
     { path: '/tasks', name: 'tasks', component: WorkspaceView, meta: { title: 'My tasks' } },
     { path: '/reminders', name: 'reminders', component: WorkspaceView, meta: { title: 'Reminders' } },
     { path: '/follow-ups', name: 'followups', component: WorkspaceView, meta: { title: 'Follow-ups' } },
+    { path: '/communication-tools', name: 'communication-tools', component: WorkspaceView, meta: { title: 'Communication Tools' } },
     { path: '/assistant', name: 'assistant', component: WorkspaceView, meta: { title: 'AI assistant' } },
     { path: '/knowledge', name: 'knowledge', component: WorkspaceView, meta: { title: 'Knowledge hub' } },
     { path: '/integrations', name: 'integrations', component: WorkspaceView, meta: { title: 'Integrations' } },

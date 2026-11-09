@@ -72,13 +72,6 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 /**
- * Events emitted by component
- */
-defineEmits<{
-  retry: []
-}>()
-
-/**
  * Get status label
  */
 const statusLabel = computed(() => {

@@ -90,13 +90,6 @@ defineProps<Props>()
 /**
  * Events emitted by component
  */
-defineEmits<{
-  toggleStar: []
-  convertTask: []
-  reply: []
-  markRead: []
-}>()
-
 const emit = defineEmits<{
   toggleStar: []
   convertTask: []
