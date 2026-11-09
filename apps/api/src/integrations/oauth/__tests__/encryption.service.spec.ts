@@ -3,10 +3,19 @@ import { EncryptionService } from '../encryption.service';
 
 describe('EncryptionService', () => {
   let service: EncryptionService;
+  const originalMasterKey = process.env.ENCRYPTION_MASTER_KEY;
 
   beforeAll(() => {
     // Set a test encryption key
     process.env.ENCRYPTION_MASTER_KEY = 'a'.repeat(64); // 32 bytes hex
+  });
+
+  afterAll(() => {
+    if (originalMasterKey === undefined) {
+      delete process.env.ENCRYPTION_MASTER_KEY;
+    } else {
+      process.env.ENCRYPTION_MASTER_KEY = originalMasterKey;
+    }
   });
 
   beforeEach(async () => {
@@ -92,8 +101,8 @@ describe('EncryptionService', () => {
       const random1 = service.generateRandomString(length);
       const random2 = service.generateRandomString(length);
 
-      expect(random1).toHaveLength(length);
-      expect(random2).toHaveLength(length);
+      expect(random1).toHaveLength(length * 2);
+      expect(random2).toHaveLength(length * 2);
       expect(random1).not.toBe(random2); // Should be different
     });
 
@@ -151,7 +160,8 @@ describe('EncryptionService', () => {
       const parts = encrypted.split('.');
 
       // Tamper with auth tag
-      const tamperedAuthTag = parts[2].substring(0, 30) + 'AA';
+      const replacement = parts[2].endsWith('aa') ? 'bb' : 'aa';
+      const tamperedAuthTag = parts[2].substring(0, 30) + replacement;
       const tamperedCiphertext = `${parts[0]}.${parts[1]}.${tamperedAuthTag}`;
 
       expect(() => service.decrypt(tamperedCiphertext)).toThrow();
@@ -168,6 +178,21 @@ describe('EncryptionService', () => {
   });
 
   describe('edge cases', () => {
+    it('rejects non-hexadecimal master keys', () => {
+      process.env.ENCRYPTION_MASTER_KEY = 'z'.repeat(64);
+      try {
+        expect(() => new EncryptionService()).toThrow('ENCRYPTION_MASTER_KEY');
+      } finally {
+        process.env.ENCRYPTION_MASTER_KEY = 'a'.repeat(64);
+      }
+    });
+
+    it('rejects trailing non-hexadecimal ciphertext data', () => {
+      const parts = service.encrypt('test-token').split('.');
+      parts[1] += 'zz';
+      expect(() => service.decrypt(parts.join('.'))).toThrow();
+    });
+
     it('should handle unicode characters', () => {
       const plaintext = '🔐 Test äöü 中文 العربية';
       const encrypted = service.encrypt(plaintext);

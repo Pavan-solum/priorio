@@ -51,9 +51,9 @@ export class AndroidNotificationsController {
    */
   @Get('notifications')
   async getNotifications(
+    @Request() req: any,
     @Query('dismissed') dismissed?: string,
     @Query('limit') limit?: string,
-    @Request() req: any,
   ): Promise<any[]> {
     const workspaceId = req.workspaceId || '00000000-0000-0000-0000-000000000001';
     const userId = req.userId || '00000000-0000-0000-0000-000000000001';

@@ -57,17 +57,20 @@ export class DocumentRetrieverService {
 
       // Calculate similarities
       const results = vectors
-        .map((v) => ({
-          knowledgeId: v.knowledgeId,
-          title: v.knowledge.title,
-          content: v.knowledge.content,
-          category: v.knowledge.category,
-          source: v.knowledge.source,
-          relevanceScore: this.embeddingService.calculateSimilarity(
-            queryVector,
-            v.embedding as any,
-          ),
-        }))
+        .map((v: any) => {
+          const k = Array.isArray(v.knowledge) ? v.knowledge[0] : v.knowledge;
+          return {
+            knowledgeId: v.knowledgeId,
+            title: k?.title || '',
+            content: k?.content || '',
+            category: k?.category || 'general',
+            source: k?.source || null,
+            relevanceScore: this.embeddingService.calculateSimilarity(
+              queryVector,
+              (v as any).embedding || [],
+            ),
+          };
+        })
         .filter((r) => r.relevanceScore > 0) // Only results with some similarity
         .sort((a, b) => b.relevanceScore - a.relevanceScore)
         .slice(0, limit);
@@ -112,17 +115,20 @@ export class DocumentRetrieverService {
 
       // Filter by threshold and sort
       const results = vectors
-        .map((v) => ({
-          knowledgeId: v.knowledgeId,
-          title: v.knowledge.title,
-          content: v.knowledge.content,
-          category: v.knowledge.category,
-          source: v.knowledge.source,
-          relevanceScore: this.embeddingService.calculateSimilarity(
-            queryVector,
-            v.embedding as any,
-          ),
-        }))
+        .map((v: any) => {
+          const k = Array.isArray(v.knowledge) ? v.knowledge[0] : v.knowledge;
+          return {
+            knowledgeId: v.knowledgeId,
+            title: k?.title || '',
+            content: k?.content || '',
+            category: k?.category || 'general',
+            source: k?.source || null,
+            relevanceScore: this.embeddingService.calculateSimilarity(
+              queryVector,
+              (v as any).embedding || [],
+            ),
+          };
+        })
         .filter((r) => r.relevanceScore >= threshold)
         .sort((a, b) => b.relevanceScore - a.relevanceScore);
 

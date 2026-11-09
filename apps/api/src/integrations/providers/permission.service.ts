@@ -5,8 +5,25 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { PermissionType } from '../../../generated/prisma';
+
+export type PermissionInput = PermissionType | 'READ' | 'WRITE' | 'DELETE' | 'ADMIN';
+
+function toPermissionType(p: PermissionInput): PermissionType {
+  switch (p) {
+    case 'READ':
+      return PermissionType.READ_MESSAGES;
+    case 'WRITE':
+      return PermissionType.WRITE_MESSAGES;
+    case 'DELETE':
+    case 'ADMIN':
+      return PermissionType.MANAGE_TASKS;
+    default:
+      return p;
+  }
+}
 
 /**
  * ProviderPermissionService: Manages granular permissions for each integration
@@ -30,7 +47,7 @@ export class ProviderPermissionService {
   async requestPermissions(
     integrationId: string,
     permissions: Array<{
-      permission: 'READ' | 'WRITE' | 'DELETE' | 'ADMIN';
+      permission: PermissionInput;
       scope: string;
       reason?: string;
     }>,
@@ -48,10 +65,11 @@ export class ProviderPermissionService {
 
       for (const perm of permissions) {
         try {
+          const mappedPermission = toPermissionType(perm.permission);
           const existing = await this.prisma.integrationPermission.findFirst({
             where: {
               integrationId,
-              permission: perm.permission,
+              permission: mappedPermission,
               scope: perm.scope,
             },
           });
@@ -60,7 +78,7 @@ export class ProviderPermissionService {
             const created = await this.prisma.integrationPermission.create({
               data: {
                 integrationId,
-                permission: perm.permission,
+                permission: mappedPermission,
                 scope: perm.scope,
                 status: 'REQUESTED',
                 metadata: {
@@ -223,14 +241,14 @@ export class ProviderPermissionService {
    */
   async validatePermissions(
     integrationId: string,
-    permission: 'READ' | 'WRITE' | 'DELETE' | 'ADMIN',
+    permission: PermissionInput,
     scope: string,
   ): Promise<boolean> {
     try {
       const perm = await this.prisma.integrationPermission.findFirst({
         where: {
           integrationId,
-          permission,
+          permission: toPermissionType(permission),
           scope,
           status: 'GRANTED',
           revokedAt: null,

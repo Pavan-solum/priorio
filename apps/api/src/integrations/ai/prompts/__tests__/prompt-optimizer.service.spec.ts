@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PromptOptimizerService } from '../prompt-optimizer.service';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { NotFoundException, BadRequestException } from '@nestjs/common';
 
 describe('PromptOptimizerService', () => {

@@ -1,13 +1,13 @@
 import { IsString, IsOptional, IsISO8601, IsEnum } from 'class-validator'
 
-enum Priority {
+export enum Priority {
   CRITICAL = 'CRITICAL',
   HIGH = 'HIGH',
   MEDIUM = 'MEDIUM',
   LOW = 'LOW',
 }
 
-enum TaskStatus {
+export enum TaskStatus {
   PENDING = 'PENDING',
   IN_PROGRESS = 'IN_PROGRESS',
   COMPLETED = 'COMPLETED',

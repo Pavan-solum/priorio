@@ -15,8 +15,8 @@ export class OpenAIProvider implements AIProvider {
   private apiKey: string;
 
   constructor(private config: ConfigService) {
-    this.apiKey = config.get('OPENAI_API_KEY');
-    this.model = config.get('OPENAI_MODEL', 'gpt-4-turbo-preview');
+    this.apiKey = config.get<string>('OPENAI_API_KEY') || '';
+    this.model = config.get<string>('OPENAI_MODEL') || 'gpt-4-turbo-preview';
 
     if (!this.apiKey) {
       this.logger.warn('OPENAI_API_KEY not configured - provider will not work');

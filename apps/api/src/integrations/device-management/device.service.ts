@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { DeviceInfo, DevicePlatform, Prisma } from '@prisma/client';
+import { DeviceInfo, DevicePlatform, Prisma } from '../../../generated/prisma';
 import { CreateDeviceDto, UpdateDeviceDto, DeviceResponseDto, DeviceCapabilities } from './dto';
 import * as crypto from 'crypto';
 
@@ -65,7 +65,7 @@ export class DeviceService {
         appVersion: createDeviceDto.appVersion,
         deviceName: createDeviceDto.deviceName,
         deviceId: createDeviceDto.deviceId,
-        capabilities: this.normalizeCapabilities(createDeviceDto.capabilities || {}),
+        capabilities: this.normalizeCapabilities(createDeviceDto.capabilities || {}) as any,
         syncStatus: 'PENDING',
         isActive: true,
       },
@@ -159,7 +159,7 @@ export class DeviceService {
     }
 
     if (updateDto.syncStatus !== undefined) {
-      updateData.syncStatus = updateDto.syncStatus;
+      updateData.syncStatus = updateDto.syncStatus as any;
     }
 
     if (updateDto.isActive !== undefined) {
@@ -185,7 +185,7 @@ export class DeviceService {
     if (updateDto.capabilities) {
       updateData.capabilities = this.normalizeCapabilities(
         updateDto.capabilities as Record<string, unknown>,
-      );
+      ) as any;
     }
 
     // Always update the timestamp
@@ -405,7 +405,7 @@ export class DeviceService {
       }
     });
 
-    return normalized;
+    return normalized as any;
   }
 
   private mapToResponseDto(device: DeviceInfo): DeviceResponseDto {
@@ -422,7 +422,7 @@ export class DeviceService {
       lastSyncAt: device.lastSyncAt,
       lastActivityAt: device.lastActivityAt,
       isActive: device.isActive,
-      capabilities: device.capabilities as DeviceCapabilities,
+      capabilities: device.capabilities as unknown as DeviceCapabilities,
       createdAt: device.createdAt,
       updatedAt: device.updatedAt,
     };

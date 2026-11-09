@@ -4,7 +4,6 @@ import {
   IsArray,
   IsBoolean,
   IsNumber,
-  IsFloat,
   Min,
   Max,
 } from 'class-validator';

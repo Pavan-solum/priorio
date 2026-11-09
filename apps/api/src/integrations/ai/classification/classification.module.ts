@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { PrismaService } from '../../prisma/prisma.service';
-import { AIService } from '../ai/ai.service';
+import { PrismaService } from '../../../prisma/prisma.service';
+import { AIService } from '../ai.service';
 import {
   TaxonomyService,
   TrainingDataService,

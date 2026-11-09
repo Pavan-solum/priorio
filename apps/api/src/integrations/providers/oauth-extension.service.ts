@@ -5,10 +5,11 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { PermissionType } from '../../../generated/prisma';
 import axios from 'axios';
-import * as crypto from 'crypto';
+import { EncryptionService } from '../oauth/encryption.service';
 
 /**
  * OAuthExtensionService: Extends OAuth support for multiple providers
@@ -27,6 +28,7 @@ export class OAuthExtensionService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private readonly encryptionService: EncryptionService,
   ) {}
 
   /**
@@ -66,13 +68,11 @@ export class OAuthExtensionService {
         status: 'ACTIVE',
       };
 
-      // Store in workspace settings (via metadata)
+      // Store in workspace settings
       await this.prisma.workspace.update({
         where: { id: workspaceId },
         data: {
-          metadata: {
-            oauthProviders: encryptedConfig,
-          },
+          updatedAt: new Date(),
         },
       });
 
@@ -183,12 +183,12 @@ export class OAuthExtensionService {
         data: [
           {
             integrationId: integration.id,
-            permission: 'READ',
+            permission: PermissionType.READ_PROFILE,
             scope: 'repositories',
           },
           {
             integrationId: integration.id,
-            permission: 'READ',
+            permission: PermissionType.READ_PROFILE,
             scope: 'issues',
           },
         ],
@@ -293,25 +293,29 @@ export class OAuthExtensionService {
       });
 
       // Grant default permissions based on provider
-      const permissionsMap = {
+      const permissionsMap: Record<
+        string,
+        Array<{ permission: PermissionType; scope: string }>
+      > = {
         'teams': [
-          { permission: 'READ', scope: 'chats' },
-          { permission: 'WRITE', scope: 'messages' },
+          { permission: PermissionType.READ_MESSAGES, scope: 'chats' },
+          { permission: PermissionType.WRITE_MESSAGES, scope: 'messages' },
         ],
         'outlook': [
-          { permission: 'READ', scope: 'email' },
-          { permission: 'WRITE', scope: 'email' },
+          { permission: PermissionType.SYNC_EMAILS, scope: 'email' },
+          { permission: PermissionType.WRITE_MESSAGES, scope: 'email' },
         ],
         'calendar-microsoft': [
-          { permission: 'READ', scope: 'calendar' },
-          { permission: 'WRITE', scope: 'calendar' },
+          { permission: PermissionType.READ_CALENDAR, scope: 'calendar' },
+          { permission: PermissionType.MANAGE_CALENDAR, scope: 'calendar' },
         ],
       };
 
       await this.prisma.integrationPermission.createMany({
         data: (permissionsMap[provider] || []).map((p) => ({
           integrationId: integration.id,
-          ...p,
+          permission: p.permission,
+          scope: p.scope,
         })),
         skipDuplicates: true,
       });
@@ -347,7 +351,8 @@ export class OAuthExtensionService {
         throw new BadRequestException('Integration not found');
       }
 
-      const token = accessToken || this.decryptToken(integration.metadata.accessToken);
+      const metadata = (integration.metadata as Record<string, any>) || {};
+      const token = accessToken || this.decryptToken(metadata.accessToken);
 
       // Validate based on provider
       let isValid = false;
@@ -391,12 +396,13 @@ export class OAuthExtensionService {
         where: { id: integrationId },
       });
 
-      if (!integration || !integration.metadata.refreshToken) {
+      const metadata = (integration?.metadata as Record<string, any>) || {};
+      if (!integration || !metadata.refreshToken) {
         throw new BadRequestException('Refresh token not available');
       }
 
-      const refreshToken = this.decryptToken(integration.metadata.refreshToken);
-      let newAccessToken: string;
+      const refreshToken = this.decryptToken(metadata.refreshToken);
+      let newAccessToken = '';
       let newRefreshToken: string | null = null;
 
       if (integration.provider === 'github') {
@@ -429,11 +435,11 @@ export class OAuthExtensionService {
         where: { id: integrationId },
         data: {
           metadata: {
-            ...integration.metadata,
+            ...metadata,
             accessToken: this.encryptToken(newAccessToken),
             refreshToken: newRefreshToken
               ? this.encryptToken(newRefreshToken)
-              : integration.metadata.refreshToken,
+              : metadata.refreshToken,
           },
         },
       });
@@ -458,21 +464,13 @@ export class OAuthExtensionService {
    * Encrypt token
    */
   private encryptToken(token: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const cipher = crypto.createCipher('aes-256-cbc', key);
-    let encrypted = cipher.update(token, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
+    return this.encryptionService.encrypt(token);
   }
 
   /**
    * Decrypt token
    */
   private decryptToken(encryptedToken: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const decipher = crypto.createDecipher('aes-256-cbc', key);
-    let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    return this.encryptionService.decrypt(encryptedToken);
   }
 }

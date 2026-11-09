@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { PromptService } from '../prompt.service';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { ConflictException, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PromptOperation } from '../dto/prompt.dto';
 

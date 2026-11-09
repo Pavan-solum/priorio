@@ -15,8 +15,8 @@ export class AnthropicProvider implements AIProvider {
   private apiKey: string;
 
   constructor(private config: ConfigService) {
-    this.apiKey = config.get('ANTHROPIC_API_KEY');
-    this.model = config.get('ANTHROPIC_MODEL', 'claude-3-sonnet-20240229');
+    this.apiKey = config.get<string>('ANTHROPIC_API_KEY') || '';
+    this.model = config.get<string>('ANTHROPIC_MODEL') || 'claude-3-sonnet-20240229';
 
     if (!this.apiKey) {
       this.logger.warn('ANTHROPIC_API_KEY not configured - provider will not work');

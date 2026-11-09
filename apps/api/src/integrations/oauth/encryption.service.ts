@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
-import * as crypto from 'crypto';
+import * as crypto from 'node:crypto';
 
 @Injectable()
 export class EncryptionService {
@@ -11,7 +11,7 @@ export class EncryptionService {
 
   constructor() {
     const keyHex = process.env.ENCRYPTION_MASTER_KEY;
-    if (!keyHex || keyHex.length !== 64) {
+    if (!keyHex || !/^[a-f\d]{64}$/i.test(keyHex)) {
       throw new Error(
         'ENCRYPTION_MASTER_KEY must be set as 32-byte hex string (64 chars)',
       );
@@ -44,6 +44,9 @@ export class EncryptionService {
       const parts = ciphertext.split('.');
       if (parts.length !== 3) {
         throw new Error('Invalid ciphertext format');
+      }
+      if (!parts.every((part) => /^(?:[a-f\d]{2})*$/i.test(part))) {
+        throw new Error('Invalid ciphertext encoding');
       }
 
       const iv = Buffer.from(parts[0], 'hex');

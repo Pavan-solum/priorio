@@ -135,11 +135,13 @@ const {
   selectedMessage,
   loadMessages,
   getChannels,
+  getByChannel,
   getBySender,
-  getChannelMessageCount,
   selectChannel,
   createTaskFromMessage,
 } = useTeamsChats()
+
+const getChannelMessageCount = (channel: string) => getByChannel(channel).length
 
 const { syncing: syncLoading, syncProgress, startSync } = useSync()
 
@@ -169,7 +171,7 @@ const filteredChannels = computed(() => {
 
 const channelMessages = computed(() => {
   if (!selectedChannel.value) return []
-  return getChannels().length > 0 ? [] : [] // TODO: Get messages by channel
+  return getByChannel(selectedChannel.value)
 })
 
 const activityLog = computed(() => [

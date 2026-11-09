@@ -59,7 +59,7 @@ export class IntelligenceController {
    */
   @Get('plans')
   async getPlans(
-    @Request() req,
+    @Request() req: any,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('limit') limit: number = 30,
@@ -88,7 +88,7 @@ export class IntelligenceController {
    */
   @Post('plans')
   @HttpCode(201)
-  async createPlan(@Request() req, @Body() body: CreateDailyPlanDTO) {
+  async createPlan(@Request() req: any, @Body() body: CreateDailyPlanDTO) {
     const workspaceId = req.user.workspaceId;
     return this.dailyPlannerService.generateDailyPlan(
       body.userId,
@@ -101,7 +101,7 @@ export class IntelligenceController {
    * GET /intelligence/plans/:id - Get specific daily plan
    */
   @Get('plans/:id')
-  async getPlan(@Request() req, @Param('id') planId: string) {
+  async getPlan(@Request() req: any, @Param('id') planId: string) {
     return this.dailyPlannerService.getDailyPlan(req.user.id, new Date());
   }
 
@@ -110,7 +110,7 @@ export class IntelligenceController {
    */
   @Put('plans/:id')
   async updatePlan(
-    @Request() req,
+    @Request() req: any,
     @Param('id') planId: string,
     @Body() body: UpdateDailyPlanDTO,
   ) {
@@ -121,7 +121,7 @@ export class IntelligenceController {
    * DELETE /intelligence/plans/:id - Delete daily plan
    */
   @Delete('plans/:id')
-  async deletePlan(@Request() req, @Param('id') planId: string) {
+  async deletePlan(@Request() req: any, @Param('id') planId: string) {
     return this.dailyPlannerService.deleteDailyPlan(planId);
   }
 
@@ -129,7 +129,7 @@ export class IntelligenceController {
    * POST /intelligence/plans/:id/execute - Mark plan as executed
    */
   @Post('plans/:id/execute')
-  async executePlan(@Request() req, @Param('id') planId: string) {
+  async executePlan(@Request() req: any, @Param('id') planId: string) {
     return this.dailyPlannerService.executeDailyPlan(planId);
   }
 
@@ -140,7 +140,7 @@ export class IntelligenceController {
    */
   @Get('followups')
   async getFollowUps(
-    @Request() req,
+    @Request() req: any,
     @Query('limit') limit: number = 20,
     @Query('offset') offset: number = 0,
   ) {
@@ -153,7 +153,7 @@ export class IntelligenceController {
    */
   @Post('followups')
   @HttpCode(201)
-  async createFollowUp(@Request() req, @Body() body: CreateFollowUpDTO) {
+  async createFollowUp(@Request() req: any, @Body() body: CreateFollowUpDTO) {
     const workspaceId = req.user.workspaceId;
     return this.followUpService.createFollowUp(
       body.sourceMessageId,
@@ -167,7 +167,7 @@ export class IntelligenceController {
    */
   @Put('followups/:id')
   async updateFollowUp(
-    @Request() req,
+    @Request() req: any,
     @Param('id') followUpId: string,
     @Body() body: UpdateFollowUpDTO,
   ) {
@@ -178,7 +178,7 @@ export class IntelligenceController {
    * GET /intelligence/followups/stats - Get follow-up statistics
    */
   @Get('followups/stats')
-  async getFollowUpStats(@Request() req) {
+  async getFollowUpStats(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.followUpService.getFollowUpStats(workspaceId);
   }
@@ -187,7 +187,7 @@ export class IntelligenceController {
    * POST /intelligence/followups/:id/complete - Mark follow-up complete
    */
   @Post('followups/:id/complete')
-  async completeFollowUp(@Request() req, @Param('id') followUpId: string) {
+  async completeFollowUp(@Request() req: any, @Param('id') followUpId: string) {
     return this.followUpService.completeFollowUp(followUpId);
   }
 
@@ -195,7 +195,7 @@ export class IntelligenceController {
    * DELETE /intelligence/followups/:id - Delete follow-up
    */
   @Delete('followups/:id')
-  async deleteFollowUp(@Request() req, @Param('id') followUpId: string) {
+  async deleteFollowUp(@Request() req: any, @Param('id') followUpId: string) {
     return this.followUpService.deleteFollowUp(followUpId);
   }
 
@@ -203,7 +203,7 @@ export class IntelligenceController {
    * GET /intelligence/followups/overdue - Get overdue follow-ups
    */
   @Get('followups/overdue')
-  async getOverdueFollowUps(@Request() req) {
+  async getOverdueFollowUps(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.followUpService.getOverdueFollowUps(workspaceId);
   }
@@ -215,7 +215,7 @@ export class IntelligenceController {
    */
   @Post('assistant/chat')
   @HttpCode(201)
-  async chat(@Request() req, @Body() body: ChatQueryDTO) {
+  async chat(@Request() req: any, @Body() body: ChatQueryDTO) {
     const userId = req.user.id;
     const workspaceId = req.user.workspaceId;
 
@@ -238,7 +238,7 @@ export class IntelligenceController {
    */
   @Get('assistant/history/:conversationId')
   async getConversationHistory(
-    @Request() req,
+    @Request() req: any,
     @Param('conversationId') conversationId: string,
     @Query('limit') limit: number = 50,
   ) {
@@ -249,7 +249,7 @@ export class IntelligenceController {
    * GET /intelligence/assistant/conversations - Get user conversations
    */
   @Get('assistant/conversations')
-  async getConversations(@Request() req, @Query('limit') limit: number = 20) {
+  async getConversations(@Request() req: any, @Query('limit') limit: number = 20) {
     const userId = req.user.id;
     return this.memoryService.getConversationTimeline(userId, limit);
   }
@@ -258,7 +258,7 @@ export class IntelligenceController {
    * DELETE /intelligence/assistant/:conversationId - Delete conversation
    */
   @Delete('assistant/:conversationId')
-  async deleteConversation(@Request() req, @Param('conversationId') conversationId: string) {
+  async deleteConversation(@Request() req: any, @Param('conversationId') conversationId: string) {
     return this.assistantService.deleteConversation(conversationId);
   }
 
@@ -269,7 +269,7 @@ export class IntelligenceController {
    */
   @Get('knowledge')
   async getKnowledge(
-    @Request() req,
+    @Request() req: any,
     @Query('category') category?: string,
     @Query('limit') limit: number = 20,
     @Query('offset') offset: number = 0,
@@ -283,7 +283,7 @@ export class IntelligenceController {
    */
   @Post('knowledge')
   @HttpCode(201)
-  async createKnowledge(@Request() req, @Body() body: CreateKnowledgeDTO) {
+  async createKnowledge(@Request() req: any, @Body() body: CreateKnowledgeDTO) {
     const workspaceId = req.user.workspaceId;
     return this.knowledgeService.createKnowledgeEntry(
       body.title,
@@ -299,7 +299,7 @@ export class IntelligenceController {
    */
   @Get('knowledge/search')
   async searchKnowledge(
-    @Request() req,
+    @Request() req: any,
     @Query() query: SearchKnowledgeDTO,
   ) {
     const workspaceId = req.user.workspaceId;
@@ -323,7 +323,7 @@ export class IntelligenceController {
    * GET /intelligence/knowledge/:id - Get knowledge by ID
    */
   @Get('knowledge/:id')
-  async getKnowledgeById(@Request() req, @Param('id') knowledgeId: string) {
+  async getKnowledgeById(@Request() req: any, @Param('id') knowledgeId: string) {
     const workspaceId = req.user.workspaceId;
     return this.knowledgeService.getKnowledgeById(knowledgeId, workspaceId);
   }
@@ -333,19 +333,19 @@ export class IntelligenceController {
    */
   @Put('knowledge/:id')
   async updateKnowledge(
-    @Request() req,
+    @Request() req: any,
     @Param('id') knowledgeId: string,
     @Body() body: UpdateKnowledgeDTO,
   ) {
     const workspaceId = req.user.workspaceId;
-    return this.knowledgeService.updateEntry(knowledgeId, body.content, workspaceId);
+    return this.knowledgeService.updateEntry(knowledgeId, body.content || '', workspaceId);
   }
 
   /**
    * DELETE /intelligence/knowledge/:id - Delete knowledge
    */
   @Delete('knowledge/:id')
-  async deleteKnowledge(@Request() req, @Param('id') knowledgeId: string) {
+  async deleteKnowledge(@Request() req: any, @Param('id') knowledgeId: string) {
     const workspaceId = req.user.workspaceId;
     return this.knowledgeService.deleteEntry(knowledgeId, workspaceId);
   }
@@ -355,7 +355,7 @@ export class IntelligenceController {
    */
   @Post('knowledge/:id/tags')
   async addTags(
-    @Request() req,
+    @Request() req: any,
     @Param('id') knowledgeId: string,
     @Body() body: { tags: string[] },
   ) {
@@ -372,7 +372,7 @@ export class IntelligenceController {
    * GET /intelligence/knowledge/categories - Get all categories
    */
   @Get('knowledge/categories')
-  async getCategories(@Request() req) {
+  async getCategories(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.knowledgeService.getCategories(workspaceId);
   }
@@ -381,7 +381,7 @@ export class IntelligenceController {
    * GET /intelligence/knowledge/tags - Get all tags
    */
   @Get('knowledge/tags')
-  async getTags(@Request() req) {
+  async getTags(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.knowledgeService.getTags(workspaceId);
   }
@@ -393,7 +393,7 @@ export class IntelligenceController {
    */
   @Post('search/semantic')
   async semanticSearch(
-    @Request() req,
+    @Request() req: any,
     @Body() body: { query: string; limit?: number; threshold?: number },
   ) {
     const workspaceId = req.user.workspaceId;
@@ -414,7 +414,7 @@ export class IntelligenceController {
    */
   @Get('search/popular')
   async getPopularDocuments(
-    @Request() req,
+    @Request() req: any,
     @Query('limit') limit: number = 10,
   ) {
     const workspaceId = req.user.workspaceId;
@@ -426,7 +426,7 @@ export class IntelligenceController {
    */
   @Get('search/recent')
   async getRecentDocuments(
-    @Request() req,
+    @Request() req: any,
     @Query('limit') limit: number = 10,
   ) {
     const workspaceId = req.user.workspaceId;
@@ -439,7 +439,7 @@ export class IntelligenceController {
    * GET /intelligence/retention/policies - Get retention policies
    */
   @Get('retention/policies')
-  async getRetentionPolicies(@Request() req) {
+  async getRetentionPolicies(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.retentionService.getPolicies(workspaceId);
   }
@@ -450,7 +450,7 @@ export class IntelligenceController {
   @Post('retention/policies')
   @HttpCode(201)
   async createRetentionPolicy(
-    @Request() req,
+    @Request() req: any,
     @Body() body: CreateRetentionPolicyDTO,
   ) {
     const workspaceId = req.user.workspaceId;
@@ -465,7 +465,7 @@ export class IntelligenceController {
    */
   @Put('retention/policies/:id')
   async updateRetentionPolicy(
-    @Request() req,
+    @Request() req: any,
     @Param('id') policyId: string,
     @Body() body: UpdateRetentionPolicyDTO,
   ) {
@@ -476,7 +476,7 @@ export class IntelligenceController {
    * DELETE /intelligence/retention/policies/:id - Delete retention policy
    */
   @Delete('retention/policies/:id')
-  async deleteRetentionPolicy(@Request() req, @Param('id') policyId: string) {
+  async deleteRetentionPolicy(@Request() req: any, @Param('id') policyId: string) {
     return this.retentionService.deletePolicy(policyId);
   }
 
@@ -484,7 +484,7 @@ export class IntelligenceController {
    * POST /intelligence/retention/execute/:id - Execute retention policy
    */
   @Post('retention/execute/:id')
-  async executeRetentionPolicy(@Request() req, @Param('id') policyId: string) {
+  async executeRetentionPolicy(@Request() req: any, @Param('id') policyId: string) {
     return this.retentionService.applyRetentionPolicy(policyId);
   }
 
@@ -492,7 +492,7 @@ export class IntelligenceController {
    * GET /intelligence/retention/report - Get retention report
    */
   @Get('retention/report')
-  async getRetentionReport(@Request() req) {
+  async getRetentionReport(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.retentionService.generateRetentionReport(workspaceId);
   }
@@ -503,7 +503,7 @@ export class IntelligenceController {
    * GET /intelligence/memory/stats - Get memory statistics
    */
   @Get('memory/stats')
-  async getMemoryStats(@Request() req) {
+  async getMemoryStats(@Request() req: any) {
     const userId = req.user.id;
     return this.memoryService.getMemoryStats(userId);
   }
@@ -513,7 +513,7 @@ export class IntelligenceController {
    */
   @Get('memory/timeline')
   async getMemoryTimeline(
-    @Request() req,
+    @Request() req: any,
     @Query('limit') limit: number = 30,
   ) {
     const userId = req.user.id;
@@ -525,7 +525,7 @@ export class IntelligenceController {
    */
   @Post('memory/search')
   async searchMemories(
-    @Request() req,
+    @Request() req: any,
     @Body() body: { query: string },
   ) {
     const userId = req.user.id;
@@ -541,7 +541,7 @@ export class IntelligenceController {
    * GET /intelligence/assistant/quality - Get response quality metrics
    */
   @Get('assistant/quality')
-  async getQualityMetrics(@Request() req) {
+  async getQualityMetrics(@Request() req: any) {
     return this.assistantService.improveResponseQuality();
   }
 
@@ -549,7 +549,7 @@ export class IntelligenceController {
    * GET /intelligence/embeddings/stats - Get embedding statistics
    */
   @Get('embeddings/stats')
-  async getEmbeddingStats(@Request() req) {
+  async getEmbeddingStats(@Request() req: any) {
     const workspaceId = req.user.workspaceId;
     return this.embeddingService.getEmbeddingStats(workspaceId);
   }

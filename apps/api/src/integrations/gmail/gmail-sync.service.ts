@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { OAuthService } from '../oauth/oauth.service';
 import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 import { TasksService } from '../../tasks/tasks.service';
+import { Priority, TaskStatus } from '../../tasks/dto/create-task.dto';
 import { google } from 'googleapis';
 import Redis from 'ioredis';
 
@@ -127,7 +128,9 @@ export class GmailSyncService {
   ): Promise<void> {
     try {
       const accessToken = await this.oauthService.getAccessToken(connectionId);
-      const gmail = google.gmail({ version: 'v1', auth: { access_token: accessToken } });
+      const auth = new google.auth.OAuth2();
+      auth.setCredentials({ access_token: accessToken });
+      const gmail = google.gmail({ version: 'v1', auth });
 
       // Get or create sync checkpoint
       let gmailSync = await this.prisma.gmailSync.findUnique({
@@ -147,7 +150,7 @@ export class GmailSyncService {
           maxResults: 50,
         });
 
-        emails = response.data.messages || [];
+        emails = (response.data.messages || []) as unknown as GmailEmail[];
       } else {
         // Incremental sync - fetch history since last sync
         const response = await gmail.users.history.list({
@@ -162,7 +165,7 @@ export class GmailSyncService {
         for (const item of historyItems) {
           if (item.messages) {
             for (const msg of item.messages) {
-              messageIds.add(msg.id);
+              if (msg.id) messageIds.add(msg.id);
             }
           }
         }
@@ -185,31 +188,17 @@ export class GmailSyncService {
         const existingTask = await this.prisma.task.findFirst({
           where: {
             workspaceId,
-            metadata: {
-              path: ['source.googleMessageId'],
-              equals: processedEmail.googleMessageId,
-            },
+            description: { contains: processedEmail.googleMessageId },
           },
         });
 
         if (!existingTask) {
           // Create task from email
-          await this.tasksService.create(workspaceId, 'system-user', {
+          await this.tasksService.create(workspaceId, '00000000-0000-0000-0000-000000000001', {
             title: processedEmail.subject || `Email from ${processedEmail.from}`,
-            description: processedEmail.body,
-            dueDate: null,
-            priority: 'MEDIUM',
-            status: 'PENDING',
-            metadata: {
-              source: {
-                type: 'gmail',
-                googleMessageId: processedEmail.googleMessageId,
-                googleThreadId: processedEmail.googleThreadId,
-                from: processedEmail.from,
-                labels: processedEmail.labels,
-              },
-              receivedAt: processedEmail.receivedAt,
-            },
+            description: `${processedEmail.body}\n\n[GoogleMessageId: ${processedEmail.googleMessageId}]`,
+            priority: Priority.MEDIUM,
+            status: TaskStatus.PENDING,
           });
 
           tasksCreated++;
@@ -242,7 +231,7 @@ export class GmailSyncService {
         userId: 'system-user',
         action: 'CREATE',
         entityType: 'GMAIL_SYNC' as any,
-        entityId: gmailSync.id,
+        entityId: gmailSync?.id || syncId,
         changes: {
           emailsProcessed: { old: null, new: emails.length },
           tasksCreated: { old: null, new: tasksCreated },

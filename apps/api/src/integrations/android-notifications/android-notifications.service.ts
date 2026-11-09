@@ -1,6 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { TasksService } from '../../tasks/tasks.service';
+import { Priority, TaskStatus } from '../../tasks/dto/create-task.dto';
 import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 interface RegisterDeviceDto {
@@ -106,17 +107,9 @@ export class AndroidNotificationsService {
         const task = await this.tasksService.create(workspaceId, userId, {
           title: dto.title,
           description: dto.body,
-          priority: 'MEDIUM',
-          status: 'PENDING',
-          dueDate: null,
-          metadata: {
-            source: {
-              type: 'android_notification',
-              appPackage: dto.appPackage,
-              notificationId: notification.id,
-            },
-            capturedAt: dto.timestamp,
-          },
+          priority: Priority.MEDIUM,
+          status: TaskStatus.PENDING,
+          dueAt: undefined,
         });
         taskId = task.id;
 
@@ -214,7 +207,7 @@ export class AndroidNotificationsService {
 
     if (preferences.allowedApps && preferences.disallowedApps) {
       const overlap = preferences.allowedApps.filter((app) =>
-        preferences.disallowedApps.includes(app),
+        preferences.disallowedApps?.includes(app),
       );
       if (overlap.length > 0) {
         throw new BadRequestException(

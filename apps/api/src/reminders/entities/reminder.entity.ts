@@ -1,4 +1,4 @@
-import type { Reminder } from '@prisma/client'
+import type { Reminder } from '../../../generated/prisma'
 
 export type { Reminder }
 

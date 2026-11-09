@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * SyncStatusService: Track sync status and generate reports
@@ -166,7 +166,7 @@ export class SyncStatusService {
           100,
       };
 
-      const syncByType = {};
+      const syncByType: Record<string, any> = {};
       for (const log of syncLogs) {
         if (!syncByType[log.syncType]) {
           syncByType[log.syncType] = {
@@ -221,11 +221,11 @@ export class SyncStatusService {
       }
 
       const durations = syncLogs
-        .filter((l) => l.durationMs)
-        .map((l) => l.durationMs);
+        .map((l) => l.durationMs)
+        .filter((d): d is number => typeof d === 'number');
       const throughputs = syncLogs
-        .filter((l) => l.itemsProcessed && l.durationMs)
-        .map((l) => (l.itemsProcessed / l.durationMs) * 1000); // items per second
+        .filter((l) => typeof l.itemsProcessed === 'number' && typeof l.durationMs === 'number' && l.durationMs > 0)
+        .map((l) => ((l.itemsProcessed ?? 0) / (l.durationMs ?? 1)) * 1000); // items per second
 
       const metrics = {
         averageDuration: this.calculateAverage(durations),
@@ -301,10 +301,11 @@ export class SyncStatusService {
       }
 
       // Check token expiry
-      if (integration.metadata?.expiresIn) {
+      const meta = (integration.metadata as Record<string, any>) || {};
+      if (typeof meta.expiresIn === 'number') {
         const expiresAt = new Date(
           integration.updatedAt.getTime() +
-            integration.metadata.expiresIn * 1000,
+            meta.expiresIn * 1000,
         );
         if (expiresAt < new Date()) {
           health = 'UNHEALTHY';

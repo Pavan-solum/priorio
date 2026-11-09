@@ -4,7 +4,7 @@ import { CalendarService } from '../providers/calendar.service';
 import { OutlookService } from '../providers/outlook.service';
 import { EventSyncEngine } from '../providers/event-sync.engine';
 import { ProviderPermissionService } from '../providers/permission.service';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import {
   mockIntegration,

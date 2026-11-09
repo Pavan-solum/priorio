@@ -49,7 +49,7 @@ export class TeamsAdapter {
         email: teamsEvent.organizer?.emailAddress?.address,
         name: teamsEvent.organizer?.emailAddress?.name,
       },
-      attendees: teamsEvent.attendees?.map((a) => ({
+      attendees: teamsEvent.attendees?.map((a: any) => ({
         email: a.emailAddress?.address,
         name: a.emailAddress?.name,
         status: a.status?.response,

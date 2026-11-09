@@ -60,9 +60,9 @@ interface Props {
   progress?: number
   itemsProcessed?: number
   totalItems?: number
-  error?: string
-  lastSyncTime?: string
-  nextSyncTime?: string
+  error?: string | null
+  lastSyncTime?: string | null
+  nextSyncTime?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {

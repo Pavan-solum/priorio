@@ -93,12 +93,12 @@ interface Props {
   provider: ProviderIntegration
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 /**
  * Events emitted by component
  */
-defineEmits<{
+const emit = defineEmits<{
   connect: []
   disconnect: []
   sync: []
@@ -116,13 +116,6 @@ const iconMap: Record<string, string> = {
   slack: 'mdi mdi-slack',
   discord: 'mdi mdi-discord',
 }
-
-const emit = defineEmits<{
-  connect: []
-  disconnect: []
-  sync: []
-  settings: []
-}>()
 
 /**
  * Get icon class for provider

@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
-import { PrismaService } from '../../../prisma/prisma.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
 import { CreateTrainingDatasetDto, CreateTrainingExampleDto, BulkAddExamplesDto } from '../dto';
 
 /**

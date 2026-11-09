@@ -57,7 +57,7 @@ export class KnowledgeService {
 
       // Create vector embedding
       if (embedding) {
-        await this.prisma.knowledgeVector.create({
+        await (this.prisma.knowledgeVector as any).create({
           data: {
             workspaceId,
             knowledgeId: knowledge.id,
@@ -123,7 +123,7 @@ export class KnowledgeService {
 
       // Update vector embedding if exists
       if (embedding && knowledge.vectorEmbeddingId) {
-        await this.prisma.knowledgeVector.update({
+        await (this.prisma.knowledgeVector as any).update({
           where: {
             workspaceId_knowledgeId: {
               workspaceId,
@@ -541,7 +541,7 @@ export class KnowledgeService {
         where: {
           workspaceId,
           isArchived: false,
-          tags: { not: { equals: [] } },
+          tags: { isEmpty: false },
         },
         select: { tags: true },
       });

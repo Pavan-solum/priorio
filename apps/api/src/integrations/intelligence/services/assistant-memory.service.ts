@@ -199,7 +199,7 @@ export class AssistantMemoryService {
         messageCount: conversation.messageCount,
         keyPoints,
         createdAt: conversation.createdAt,
-        lastMessageAt: conversation.lastMessageAt,
+        lastMessageAt: conversation.lastMessageAt || undefined,
       };
     } catch (error) {
       this.logger.error(`Error summarizing conversation: ${error.message}`);
@@ -234,7 +234,7 @@ export class AssistantMemoryService {
           );
 
           keyPoints.push(
-            ...important.map((s: string) => s.trim()).filter((s) => s.length > 0),
+            ...important.map((s: string) => s.trim()).filter((s: string) => s.length > 0),
           );
         }
       }

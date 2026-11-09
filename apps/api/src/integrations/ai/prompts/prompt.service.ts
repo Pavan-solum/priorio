@@ -1,5 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
-import { PrismaService } from 'prisma/prisma.service';
+import { PrismaService } from '../../../prisma/prisma.service';
 import {
   CreatePromptTemplateDto,
   UpdatePromptTemplateDto,

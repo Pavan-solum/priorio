@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from 'axios';
-import { Storage } from '@capacitor/storage';
+import { Preferences as Storage } from '@capacitor/preferences';
 import { useDeviceStore } from '../stores/device';
 import { useSyncStore } from '../stores/sync';
 
@@ -214,7 +214,7 @@ export class TaskSyncService {
    */
   async getOfflineTasks(): Promise<any[]> {
     try {
-      const { value } = await Storage.getItem('offlineTasks');
+      const { value } = await Storage.get({ key: 'offlineTasks' });
       return value ? JSON.parse(value) : [];
     } catch (error) {
       console.error('Error getting offline tasks:', error);
@@ -232,7 +232,7 @@ export class TaskSyncService {
         ...task,
         timestamp: Date.now(),
       });
-      await Storage.setItem('offlineTasks', JSON.stringify(tasks));
+      await Storage.set({ key: 'offlineTasks', value: JSON.stringify(tasks) });
     } catch (error) {
       console.error('Error caching offline task:', error);
     }
@@ -243,7 +243,7 @@ export class TaskSyncService {
    */
   private async updateOfflineTasksCache(): Promise<void> {
     try {
-      await Storage.setItem('offlineTasks', JSON.stringify([]));
+      await Storage.set({ key: 'offlineTasks', value: JSON.stringify([]) });
     } catch (error) {
       console.error('Error updating offline tasks cache:', error);
     }

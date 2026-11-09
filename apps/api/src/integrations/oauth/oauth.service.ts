@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EncryptionService } from './encryption.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 import { GoogleOAuthProvider } from './providers/google-provider';
 import { IOAuthProvider } from './providers/provider.interface';
 import { OAuthConnectionEntity } from './entities/oauth-connection.entity';
@@ -272,7 +272,7 @@ export class OAuthService {
       },
     });
 
-    return { expiresAt: updated.expiresAt };
+    return { expiresAt: updated.expiresAt || new Date() };
   }
 
   /**
@@ -288,11 +288,11 @@ export class OAuthService {
     }
 
     const provider = this.providers.get(connection.provider);
-    if (!provider && connection.refreshToken) {
+    if (provider && connection.refreshToken) {
       try {
         const decryptedRefreshToken = this.encryption.decrypt(connection.refreshToken);
         await provider.revokeToken(decryptedRefreshToken);
-      } catch (error) {
+      } catch (error: any) {
         console.error(`Failed to revoke token with provider: ${error.message}`);
       }
     }
@@ -339,7 +339,10 @@ export class OAuthService {
       const refreshed = await this.prisma.oAuthConnection.findUnique({
         where: { id: connectionId },
       });
-      return this.encryption.decrypt(refreshed.accessToken);
+      if (refreshed) {
+        return this.encryption.decrypt(refreshed.accessToken);
+      }
+      return this.encryption.decrypt(connection.accessToken);
     }
 
     return this.encryption.decrypt(connection.accessToken);

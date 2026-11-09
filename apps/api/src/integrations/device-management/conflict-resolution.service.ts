@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { ConflictResolutionStrategy } from '@prisma/client';
+import { ConflictResolutionStrategy } from '../../../generated/prisma';
 import { ConflictResolutionDto, SyncConflictResponseDto } from './dto';
 
 @Injectable()
@@ -32,8 +32,8 @@ export class ConflictResolutionService {
       const updated = await this.prisma.syncConflict.update({
         where: { id: existingConflict.id },
         data: {
-          localData,
-          remoteData,
+          localData: localData as any,
+          remoteData: remoteData as any,
           updatedAt: new Date(),
         },
       });
@@ -47,8 +47,8 @@ export class ConflictResolutionService {
         workspaceId,
         itemType,
         itemId,
-        localData,
-        remoteData,
+        localData: localData as any,
+        remoteData: remoteData as any,
         strategy: 'MANUAL_RESOLUTION',
       },
     });
@@ -76,11 +76,11 @@ export class ConflictResolutionService {
     let resolution: Record<string, unknown>;
 
     if (resolutionStrategy === 'LAST_WRITE_WINS') {
-      resolution = conflict.remoteData; // Remote is assumed to be latest
+      resolution = (conflict.remoteData as Record<string, unknown>) || {}; // Remote is assumed to be latest
     } else if (resolutionStrategy === 'KEEP_LOCAL') {
-      resolution = conflict.localData;
+      resolution = (conflict.localData as Record<string, unknown>) || {};
     } else if (resolutionStrategy === 'KEEP_REMOTE') {
-      resolution = conflict.remoteData;
+      resolution = (conflict.remoteData as Record<string, unknown>) || {};
     } else {
       // MANUAL_RESOLUTION requires explicit resolution data
       throw new BadRequestException('Manual resolution requires explicit resolution data');
@@ -94,7 +94,7 @@ export class ConflictResolutionService {
       where: { id: conflictId },
       data: {
         strategy: resolutionStrategy,
-        resolution,
+        resolution: resolution as any,
         resolvedAt: new Date(),
         updatedAt: new Date(),
       },
@@ -135,7 +135,7 @@ export class ConflictResolutionService {
       where: { id: conflictId },
       data: {
         strategy: 'MANUAL_RESOLUTION',
-        resolution: resolutionDto.resolution,
+        resolution: resolutionDto.resolution as any,
         resolvedAt: new Date(),
         updatedAt: new Date(),
       },
@@ -166,7 +166,7 @@ export class ConflictResolutionService {
         data: {
           title: (resolution.title as string) || undefined,
           description: (resolution.description as string) || undefined,
-          status: (resolution.status as string) || undefined,
+          status: (resolution.status as any) || undefined,
           priority: (resolution.priority as any) || undefined,
           dueAt: resolution.dueAt ? new Date(resolution.dueAt as string) : undefined,
         },
@@ -243,7 +243,8 @@ export class ConflictResolutionService {
             itemId,
             resolution,
           } as any,
-        } as any);
+        } as any,
+      });
     }
   }
 

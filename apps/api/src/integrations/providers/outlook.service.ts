@@ -5,10 +5,10 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import * as crypto from 'crypto';
+import { EncryptionService } from '../oauth/encryption.service';
 
 /**
  * OutlookService: Handles Microsoft Outlook integration
@@ -28,6 +28,7 @@ export class OutlookService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private readonly encryptionService: EncryptionService,
   ) {
     this.initializeOutlookClient();
   }
@@ -139,8 +140,9 @@ export class OutlookService {
         },
       });
 
+      const metadata = (integration.metadata as Record<string, any>) || {};
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
       let itemsProcessed = 0;
       let itemsSucceeded = 0;
@@ -177,8 +179,8 @@ export class OutlookService {
                 organizer: email.from?.emailAddress?.address,
                 metadata: {
                   from: email.from?.emailAddress?.address,
-                  to: email.toRecipients?.map((r) => r.emailAddress?.address),
-                  cc: email.ccRecipients?.map((r) => r.emailAddress?.address),
+                  to: email.toRecipients?.map((r: any) => r.emailAddress?.address),
+                  cc: email.ccRecipients?.map((r: any) => r.emailAddress?.address),
                   hasAttachments: email.hasAttachments,
                   categories: email.categories,
                   isRead: email.isRead,
@@ -271,8 +273,9 @@ export class OutlookService {
         },
       });
 
+      const metadata = (integration.metadata as Record<string, any>) || {};
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
       let itemsProcessed = 0;
       let itemsSucceeded = 0;
@@ -312,7 +315,7 @@ export class OutlookService {
                 endTime: new Date(event.end.dateTime),
                 organizer: event.organizer?.emailAddress?.address,
                 attendees: event.attendees?.map(
-                  (a) => a.emailAddress?.address,
+                  (a: any) => a.emailAddress?.address,
                 ) || [],
                 location: event.location?.displayName,
                 metadata: {
@@ -421,8 +424,9 @@ export class OutlookService {
       }
 
       // Fetch email details
+      const metadata = (integration.metadata as Record<string, any>) || {};
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
 
       const emailResponse = await this.retryApiCall(() =>
@@ -437,6 +441,7 @@ export class OutlookService {
       const task = await this.prisma.task.create({
         data: {
           workspaceId: integration.workspaceId,
+          createdById: integration.userId,
           title:
             taskData?.title ||
             `Task from Email: ${email.subject}`,
@@ -444,13 +449,8 @@ export class OutlookService {
             taskData?.description ||
             `From: ${email.from?.emailAddress?.address}\n\n${email.bodyPreview}`,
           priority: (taskData?.priority || 'MEDIUM').toUpperCase() as any,
-          dueDate: taskData?.dueDate,
-          status: 'TODO',
-          metadata: {
-            source: 'outlook',
-            emailId,
-            from: email.from?.emailAddress?.address,
-          },
+          dueAt: taskData?.dueDate ? new Date(taskData.dueDate) : undefined,
+          status: 'PENDING',
         },
       });
 
@@ -505,8 +505,9 @@ export class OutlookService {
         throw new UnauthorizedException('Integration not connected');
       }
 
+      const metadata = (integration.metadata as Record<string, any>) || {};
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
 
       // Fetch user mailbox statistics
@@ -535,7 +536,7 @@ export class OutlookService {
         where: { id: integrationId },
         data: {
           metadata: {
-            ...integration.metadata,
+            ...metadata,
             lastActivity: activity,
           },
         },
@@ -650,21 +651,13 @@ export class OutlookService {
    * Encrypt sensitive token data
    */
   private encryptToken(token: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const cipher = crypto.createCipher('aes-256-cbc', key);
-    let encrypted = cipher.update(token, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
+    return this.encryptionService.encrypt(token);
   }
 
   /**
    * Decrypt encrypted token
    */
   private decryptToken(encryptedToken: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const decipher = crypto.createDecipher('aes-256-cbc', key);
-    let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    return this.encryptionService.decrypt(encryptedToken);
   }
 }

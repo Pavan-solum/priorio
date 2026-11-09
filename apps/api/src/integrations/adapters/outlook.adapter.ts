@@ -24,15 +24,15 @@ export class OutlookAdapter {
         email: email.from?.emailAddress?.address,
         name: email.from?.emailAddress?.name,
       },
-      to: email.toRecipients?.map((r) => ({
+      to: email.toRecipients?.map((r: any) => ({
         email: r.emailAddress?.address,
         name: r.emailAddress?.name,
       })) || [],
-      cc: email.ccRecipients?.map((r) => ({
+      cc: email.ccRecipients?.map((r: any) => ({
         email: r.emailAddress?.address,
         name: r.emailAddress?.name,
       })) || [],
-      bcc: email.bccRecipients?.map((r) => ({
+      bcc: email.bccRecipients?.map((r: any) => ({
         email: r.emailAddress?.address,
         name: r.emailAddress?.name,
       })) || [],
@@ -42,7 +42,7 @@ export class OutlookAdapter {
       isImportant: email.importance === 'high',
       hasAttachments: email.hasAttachments,
       categories: email.categories || [],
-      attachments: email.attachments?.map((a) => ({
+      attachments: email.attachments?.map((a: any) => ({
         id: a.id,
         name: a.name,
         size: a.size,
@@ -159,7 +159,7 @@ export class OutlookAdapter {
 
     // Look for signature delimiters
     const delimiterIndex = lines.findIndex(
-      (line) =>
+      (line: string) =>
         line.includes('--') ||
         line.includes('___') ||
         line.includes('==='),

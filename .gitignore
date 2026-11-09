@@ -10,3 +10,5 @@ apps/api/generated/
 coverage/
 .DS_Store
 *.log
+.vscode/
+*.tsbuildinfo

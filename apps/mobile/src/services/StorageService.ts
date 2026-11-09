@@ -1,4 +1,4 @@
-import { Storage as CapacitorStorage } from '@capacitor/storage';
+import { Preferences as CapacitorStorage } from '@capacitor/preferences';
 import CryptoJS from 'crypto-js';
 
 /**
@@ -34,7 +34,7 @@ export class StorageService {
    */
   async getItem<T>(key: string, encrypted: boolean = false): Promise<T | null> {
     try {
-      const { value } = await CapacitorStorage.getItem(key);
+      const { value } = await CapacitorStorage.get({ key });
 
       if (!value) {
         return null;
@@ -136,7 +136,7 @@ export class StorageService {
       let size = 0;
 
       for (const key of keys) {
-        const item = await CapacitorStorage.getItem(key);
+        const item = await CapacitorStorage.get({ key });
         if (item.value) {
           size += item.value.length;
         }

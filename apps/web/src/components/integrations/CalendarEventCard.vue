@@ -90,16 +90,11 @@ interface Props {
   event: CalendarEvent
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 /**
  * Events emitted by component
  */
-defineEmits<{
-  createTask: []
-  edit: []
-}>()
-
 const emit = defineEmits<{
   createTask: []
   edit: []

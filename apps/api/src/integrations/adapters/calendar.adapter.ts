@@ -26,7 +26,7 @@ export class CalendarAdapter {
         email: event.organizer?.email,
         name: event.organizer?.displayName,
       },
-      attendees: event.attendees?.map((a) => ({
+      attendees: event.attendees?.map((a: any) => ({
         email: a.email,
         name: a.displayName,
         status: a.responseStatus,
@@ -59,7 +59,7 @@ export class CalendarAdapter {
         email: event.organizer?.emailAddress?.address,
         name: event.organizer?.emailAddress?.name,
       },
-      attendees: event.attendees?.map((a) => ({
+      attendees: event.attendees?.map((a: any) => ({
         email: a.emailAddress?.address,
         name: a.emailAddress?.name,
         status: a.status?.response,

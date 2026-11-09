@@ -4,8 +4,8 @@ export class OAuthConnectionEntity {
   userId: string;
   scopes: string[];
   connectedAt: Date;
-  lastSyncAt?: Date;
-  revokedAt?: Date;
+  lastSyncAt?: Date | null;
+  revokedAt?: Date | null;
   status: 'active' | 'revoked' | 'expired';
 }
 

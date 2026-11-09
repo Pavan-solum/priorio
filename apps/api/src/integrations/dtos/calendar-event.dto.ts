@@ -40,7 +40,7 @@ export class CalendarEventDto {
 
   @IsOptional()
   @IsArray()
-  @IsEmail({ each: true })
+  @IsEmail({}, { each: true })
   attendees?: string[];
 
   @IsOptional()
@@ -115,7 +115,7 @@ export class CreateEventFromTaskDto {
 
   @IsOptional()
   @IsArray()
-  @IsEmail({ each: true })
+  @IsEmail({}, { each: true })
   attendees?: string[];
 
   @IsOptional()
@@ -154,7 +154,7 @@ export class SuggestOptimalTimeDto {
 
   @IsOptional()
   @IsArray()
-  @IsEmail({ each: true })
+  @IsEmail({}, { each: true })
   attendees?: string[];
 
   @IsOptional()

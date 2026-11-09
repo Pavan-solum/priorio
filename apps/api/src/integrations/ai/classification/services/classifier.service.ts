@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../../../prisma/prisma.service';
-import { AIService } from '../ai.service';
+import { PrismaService } from '../../../../prisma/prisma.service';
+import { AIService } from '../../ai.service';
 import { TrainClassifierDto, ClassifyTextDto, BatchClassifyDto } from '../dto';
 
 /**

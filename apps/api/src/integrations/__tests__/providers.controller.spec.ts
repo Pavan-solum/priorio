@@ -4,7 +4,7 @@ import { TeamsService } from '../providers/teams.service';
 import { CalendarService } from '../providers/calendar.service';
 import { OutlookService } from '../providers/outlook.service';
 import { ProviderPermissionService } from '../providers/permission.service';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import {
   mockIntegration,
   mockTeamsTokens,

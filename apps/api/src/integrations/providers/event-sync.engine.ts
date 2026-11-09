@@ -4,8 +4,9 @@ import {
   BadRequestException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
+import { ConflictResolutionStrategy } from '../../../generated/prisma';
 
 /**
  * EventSyncEngine: Central sync orchestration across all providers
@@ -141,7 +142,7 @@ export class EventSyncEngine {
       const localMap = new Map(
         localEvents.map((e) => [e.externalEventId, e]),
       );
-      const changes = {
+      const changes: { added: any[]; modified: any[]; deleted: any[] } = {
         added: [],
         modified: [],
         deleted: [],
@@ -199,7 +200,7 @@ export class EventSyncEngine {
    */
   async resolveConflicts(
     workspaceId: string,
-    strategy: 'LAST_WRITE_WINS' | 'LOCAL_WINS' | 'REMOTE_WINS' | 'MANUAL' = 'LAST_WRITE_WINS',
+    strategy: string = 'LAST_WRITE_WINS',
   ): Promise<any> {
     try {
       const conflicts = await this.prisma.syncConflict.findMany({
@@ -215,24 +216,34 @@ export class EventSyncEngine {
         try {
           let resolution: any;
 
+          const localData = (conflict.localData as Record<string, any>) || {};
+          const remoteData = (conflict.remoteData as Record<string, any>) || {};
+          let dbStrategy: ConflictResolutionStrategy = ConflictResolutionStrategy.LAST_WRITE_WINS;
+
           if (strategy === 'LAST_WRITE_WINS') {
-            const localUpdated = new Date(conflict.localData.updatedAt);
-            const remoteUpdated = new Date(conflict.remoteData.updatedAt);
+            const localUpdated = new Date(localData.updatedAt || 0);
+            const remoteUpdated = new Date(remoteData.updatedAt || 0);
             resolution =
               localUpdated > remoteUpdated
-                ? conflict.localData
-                : conflict.remoteData;
-          } else if (strategy === 'LOCAL_WINS') {
-            resolution = conflict.localData;
-          } else if (strategy === 'REMOTE_WINS') {
-            resolution = conflict.remoteData;
+                ? localData
+                : remoteData;
+            dbStrategy = ConflictResolutionStrategy.LAST_WRITE_WINS;
+          } else if (strategy === 'LOCAL_WINS' || strategy === 'KEEP_LOCAL') {
+            resolution = localData;
+            dbStrategy = ConflictResolutionStrategy.KEEP_LOCAL;
+          } else if (strategy === 'REMOTE_WINS' || strategy === 'KEEP_REMOTE') {
+            resolution = remoteData;
+            dbStrategy = ConflictResolutionStrategy.KEEP_REMOTE;
+          } else {
+            resolution = localData;
+            dbStrategy = ConflictResolutionStrategy.MANUAL_RESOLUTION;
           }
 
           if (resolution) {
             await this.prisma.syncConflict.update({
               where: { id: conflict.id },
               data: {
-                strategy,
+                strategy: dbStrategy,
                 resolution,
                 resolvedAt: new Date(),
               },

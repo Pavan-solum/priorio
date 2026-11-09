@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { OutlookService } from '../providers/outlook.service';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import {
   mockOutlookTokens,

@@ -1,6 +1,6 @@
 import { Injectable, BadRequestException, NotFoundException, InternalServerErrorException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { SyncStatus, Priority, Prisma } from '@prisma/client';
+import { SyncStatus, Priority, Prisma } from '../../../generated/prisma';
 import { InitiateSyncDto, SyncStatusResponseDto, SyncConflict } from './dto';
 import { ConflictResolutionService } from './conflict-resolution.service';
 import { OfflineTaskService } from './offline-task.service';
@@ -44,7 +44,7 @@ export class SyncService {
           clientTimestamp: initiateSyncDto.clientTimestamp,
           requestId: this.generateRequestId(),
           deviceInfo: initiateSyncDto.deviceInfo || {},
-        },
+        } as any,
       },
     });
 
@@ -412,24 +412,14 @@ export class SyncService {
    * Get average sync time for workspace
    */
   private async getAverageSyncTime(workspaceId: string): Promise<number> {
-    const result = await this.prisma.deviceSyncLog.aggregateRaw({
-      pipeline: [
-        {
-          $match: {
-            workspaceId: new (require('mongodb')).ObjectId(workspaceId),
-            duration: { $exists: true, $ne: null },
-          },
-        },
-        {
-          $group: {
-            _id: null,
-            avgDuration: { $avg: '$duration' },
-          },
-        },
-      ],
-    } as any);
+    const aggregations = await this.prisma.deviceSyncLog.aggregate({
+      where: { workspaceId },
+      _avg: {
+        duration: true,
+      },
+    });
 
-    return (result?.[0]?.avgDuration || 0) as number;
+    return aggregations._avg.duration || 0;
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../../../generated/prisma';
 
 interface TimeBlock {
   taskId: string;
@@ -143,7 +143,7 @@ export class DailyPlannerService {
   async optimizeTaskOrder(tasks: any[]): Promise<any[]> {
     try {
       // Sort by priority (HIGH, CRITICAL first), then by due date
-      const priorityMap = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
+      const priorityMap: Record<string, number> = { CRITICAL: 3, HIGH: 2, MEDIUM: 1, LOW: 0 };
 
       return [...tasks].sort((a, b) => {
         const priorityDiff =
@@ -211,7 +211,7 @@ export class DailyPlannerService {
    */
   private estimateTaskDuration(task: any, historicalData: any): number {
     // Base estimate: 30-60 minutes depending on priority
-    const priorityDurationMap = {
+    const priorityDurationMap: Record<string, number> = {
       CRITICAL: 60,
       HIGH: 45,
       MEDIUM: 30,

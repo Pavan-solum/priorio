@@ -103,7 +103,7 @@ export class EmbeddingService {
       const normalizedText = text.trim().toLowerCase();
       const mockEmbedding = this.generateMockEmbedding(normalizedText);
 
-      const vector = await this.prisma.knowledgeVector.upsert({
+      const vector = await (this.prisma.knowledgeVector as any).upsert({
         where: {
           workspaceId_knowledgeId: {
             workspaceId,
@@ -344,7 +344,7 @@ export class EmbeddingService {
       const similarities = vectors
         .map((v) => ({
           ...v,
-          similarity: this.calculateSimilarity(embedding, v.embedding as any),
+          similarity: this.calculateSimilarity(embedding, (v as any).embedding || []),
         }))
         .filter((v) => v.similarity >= threshold)
         .sort((a, b) => b.similarity - a.similarity)

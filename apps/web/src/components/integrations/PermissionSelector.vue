@@ -95,16 +95,11 @@ interface Props {
   permissions: PermissionScope[]
 }
 
-defineProps<Props>()
+const props = defineProps<Props>()
 
 /**
  * Events emitted by component
  */
-defineEmits<{
-  confirm: [selectedScopes: string[], expiryDate?: string]
-  cancel: []
-}>()
-
 const emit = defineEmits<{
   confirm: [selectedScopes: string[], expiryDate?: string]
   cancel: []

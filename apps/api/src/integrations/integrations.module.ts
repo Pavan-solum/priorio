@@ -18,7 +18,7 @@ import { ProviderNotificationService } from './adapters/provider-notification.se
 import { SyncStatusService } from './adapters/sync-status.service';
 import { ProvidersController } from './providers.controller';
 import { ConfigService } from '@nestjs/config';
-import { PrismaService } from '../common/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   imports: [

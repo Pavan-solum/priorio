@@ -89,7 +89,7 @@ import {
   trash,
 } from 'ionicons/icons';
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Storage } from '@capacitor/storage';
+import { Preferences as Storage } from '@capacitor/preferences';
 
 interface Notification {
   id: string;

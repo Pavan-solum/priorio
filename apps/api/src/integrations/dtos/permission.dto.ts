@@ -47,7 +47,7 @@ export class GrantPermissionsDto {
 
   @IsNotEmpty()
   @IsArray()
-  @IsUUID({ each: true })
+  @IsUUID(undefined, { each: true })
   permissionIds: string[];
 }
 
@@ -61,7 +61,7 @@ export class RevokePermissionsDto {
 
   @IsOptional()
   @IsArray()
-  @IsUUID({ each: true })
+  @IsUUID(undefined, { each: true })
   permissionIds?: string[];
 }
 

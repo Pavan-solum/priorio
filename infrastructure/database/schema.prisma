@@ -367,6 +367,7 @@ model Task {
   sourceMessage   Message?   @relation(fields: [sourceMessageId], references: [id], onDelete: SetNull)
   subtasks        Subtask[]
   providerTasks   ProviderTask[]
+  androidNotifications AndroidNotification[]
 
   @@index([workspaceId, status, dueAt])
   @@index([createdById, status])
@@ -760,7 +761,7 @@ model TrainingDataset {
   size              Int      @default(0)
   
   trainingExamples  TrainingExample[]
-  classifier        Classifier?
+  classifiers       Classifier[]
   
   createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   

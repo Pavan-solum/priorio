@@ -5,10 +5,10 @@ import {
   UnauthorizedException,
   InternalServerErrorException,
 } from '@nestjs/common';
-import { PrismaService } from '../../common/prisma/prisma.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
-import * as crypto from 'crypto';
+import { EncryptionService } from '../oauth/encryption.service';
 import * as moment from 'moment-timezone';
 
 /**
@@ -29,6 +29,7 @@ export class CalendarService {
   constructor(
     private prisma: PrismaService,
     private configService: ConfigService,
+    private readonly encryptionService: EncryptionService,
   ) {
     this.initializeCalendarClient();
   }
@@ -148,8 +149,9 @@ export class CalendarService {
         },
       });
 
+      const metadata = (integration.metadata as Record<string, any>) || {};
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
       let itemsProcessed = 0;
       let itemsSucceeded = 0;
@@ -158,7 +160,7 @@ export class CalendarService {
         const events = await this.fetchProviderEvents(
           provider,
           accessToken,
-          integration.metadata.timezone,
+          metadata.timezone,
         );
 
         for (const event of events) {
@@ -180,12 +182,12 @@ export class CalendarService {
                 startTime: new Date(event.start.dateTime),
                 endTime: new Date(event.end.dateTime),
                 organizer: event.organizer?.email,
-                attendees: event.attendees?.map((a) => a.email) || [],
+                attendees: event.attendees?.map((a: any) => a.email) || [],
                 location: event.location,
                 metadata: {
                   googleCalendarId: event.id,
                   isRecurring: !!event.recurrence,
-                  timezone: integration.metadata.timezone,
+                  timezone: metadata.timezone,
                 },
               },
               update: {
@@ -286,10 +288,11 @@ export class CalendarService {
       const provider = integration.provider.includes('google')
         ? 'google'
         : 'microsoft';
+      const metadata = (integration.metadata as Record<string, any>) || {};
+      const timezone = metadata.timezone || 'UTC';
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
-      const timezone = integration.metadata.timezone || 'UTC';
 
       const eventPayload = {
         summary: eventData.title || task.title,
@@ -384,10 +387,11 @@ export class CalendarService {
       const provider = integration.provider.includes('google')
         ? 'google'
         : 'microsoft';
+      const metadata = (integration.metadata as Record<string, any>) || {};
+      const timezone = metadata.timezone || 'UTC';
       const accessToken = this.decryptToken(
-        integration.metadata.accessToken,
+        metadata.accessToken,
       );
-      const timezone = integration.metadata.timezone || 'UTC';
 
       // Fetch events in date range
       const events = await this.retryApiCall(() =>
@@ -449,7 +453,8 @@ export class CalendarService {
       const endDate =
         preferences?.dateRange?.end ||
         new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
-      const timezone = integration.metadata.timezone || 'UTC';
+      const metadata = (integration.metadata as Record<string, any>) || {};
+      const timezone = metadata.timezone || 'UTC';
 
       // Get availability for primary user
       const availability = await this.fetchAvailability(
@@ -459,7 +464,7 @@ export class CalendarService {
       );
 
       // Score available slots based on preferences
-      const scoredSlots = availability.availableSlots.map((slot) => {
+      const scoredSlots = availability.availableSlots.map((slot: any) => {
         let score = 100;
 
         // Prefer morning over evening
@@ -481,7 +486,7 @@ export class CalendarService {
 
       // Return top 5 suggestions sorted by score
       const suggestions = scoredSlots
-        .sort((a, b) => b.score - a.score)
+        .sort((a: any, b: any) => b.score - a.score)
         .slice(0, 5);
 
       return {
@@ -731,21 +736,13 @@ export class CalendarService {
    * Encrypt sensitive token data
    */
   private encryptToken(token: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const cipher = crypto.createCipher('aes-256-cbc', key);
-    let encrypted = cipher.update(token, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    return encrypted;
+    return this.encryptionService.encrypt(token);
   }
 
   /**
    * Decrypt encrypted token
    */
   private decryptToken(encryptedToken: string): string {
-    const key = this.configService.get('ENCRYPTION_KEY', 'default-key');
-    const decipher = crypto.createDecipher('aes-256-cbc', key);
-    let decrypted = decipher.update(encryptedToken, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
+    return this.encryptionService.decrypt(encryptedToken);
   }
 }

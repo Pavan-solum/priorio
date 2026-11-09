@@ -31,12 +31,12 @@ export class OutlookEmailDto {
 
   @IsOptional()
   @IsArray()
-  @IsEmail({ each: true })
+  @IsEmail({}, { each: true })
   to?: string[];
 
   @IsOptional()
   @IsArray()
-  @IsEmail({ each: true })
+  @IsEmail({}, { each: true })
   cc?: string[];
 
   @IsNotEmpty()

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Priority } from '@prisma/client';
+import { Priority } from '../../../generated/prisma';
 import { CreateOfflineTaskDto, OfflineTaskResponseDto } from './dto';
 
 @Injectable()
@@ -46,7 +46,7 @@ export class OfflineTaskService {
         workspaceId,
         taskId: createOfflineTaskDto.taskId || null,
         operation: createOfflineTaskDto.operation.toUpperCase(),
-        taskData,
+        taskData: taskData as any,
       },
     });
 
@@ -142,7 +142,7 @@ export class OfflineTaskService {
           description: (taskData.description as string) || undefined,
           priority: (taskData.priority as Priority) || undefined,
           dueAt: taskData.dueAt ? new Date(taskData.dueAt as string) : undefined,
-          status: (taskData.status as string) || undefined,
+          status: (taskData.status as any) || undefined,
         },
       });
     } else if (operation === 'DELETE' && offlineTask.taskId) {
