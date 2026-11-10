@@ -2,13 +2,15 @@
 import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
-  Archive, ArrowUpRight, Bell, BookOpen, CalendarDays, Check, CheckCircle2,
-  ChevronDown, ChevronRight, CircleHelp, Clock3, Command, Filter, Inbox,
-  LayoutDashboard, ListTodo, Mail, Menu, MessageCircle, MessageSquare, MoreHorizontal, Plus,
-  Search, Send, Settings2, ShieldCheck, Sparkles, Star, Tag, X,
+  AlertCircle, Archive, ArrowUpRight, Bell, BookOpen, Calendar, CalendarDays,
+  Check, CheckCircle2, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3,
+  Command, ExternalLink, FileText, Filter, Inbox, LayoutDashboard, ListTodo,
+  Mail, Menu, MessageCircle, MessageSquare, MoreHorizontal, Plus, RotateCcw,
+  Search, Send, Settings2, ShieldCheck, Sparkles, Star, Tag, Trash2, X,
 } from 'lucide-vue-next'
-import { useWorkspaceStore, type InboxMessage, type Priority } from '../stores/workspace'
+import { useWorkspaceStore, type InboxMessage, type Priority, type AssistantChatMessage } from '../stores/workspace'
 import CommunicationToolsView from './CommunicationToolsView.vue'
+import DailyPlannerView from './DailyPlannerView.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -29,6 +31,7 @@ const primaryNavigation = [
   { name: 'today', label: 'Today', icon: LayoutDashboard },
   { name: 'inbox', label: 'Smart inbox', icon: Inbox, count: computed(() => workspace.messages.filter((message) => !message.archived && !message.read).length) },
   { name: 'tasks', label: 'My tasks', icon: ListTodo, count: computed(() => workspace.tasks.filter((task) => task.status !== 'completed').length) },
+  { name: 'daily-planner', label: 'Daily planner', icon: CalendarDays },
   { name: 'reminders', label: 'Reminders', icon: Bell },
   { name: 'followups', label: 'Follow-ups', icon: Send },
 ]
@@ -124,6 +127,268 @@ function navigateTo(name: string) {
   router.push({ name })
   mobileMenuOpen.value = false
 }
+
+// -------------------------------------------------------------
+// AI Assistant State & Methods
+// -------------------------------------------------------------
+const assistantInput = ref('')
+const isAssistantThinking = ref(false)
+const assistantChatEnd = ref<HTMLElement | null>(null)
+
+function scrollToAssistantChat() {
+  setTimeout(() => {
+    assistantChatEnd.value?.scrollIntoView({ behavior: 'smooth' })
+  }, 50)
+}
+
+function askPrompt(prompt: string) {
+  assistantInput.value = prompt
+  sendAssistantMessage()
+}
+
+function sendAssistantMessage() {
+  const query = assistantInput.value.trim()
+  if (!query || isAssistantThinking.value) return
+
+  workspace.addAssistantMessage({
+    role: 'user',
+    content: query,
+  })
+  assistantInput.value = ''
+  isAssistantThinking.value = true
+  scrollToAssistantChat()
+
+  setTimeout(() => {
+    isAssistantThinking.value = false
+    const qLower = query.toLowerCase()
+
+    let responseContent = ''
+    let citations: string[] = []
+    let suggestedAction: AssistantChatMessage['suggestedAction'] | undefined = undefined
+
+    if (qLower.includes('focus') || qLower.includes('today') || qLower.includes('plan')) {
+      const openTodayCount = todayTasks.value.length
+      const urgentReplyCount = pendingReplies.value.length
+      responseContent = `Based on your schedule and communications, here is your high-impact focus plan for today:\n\n1. **Critical Response**: You have ${urgentReplyCount} conversation(s) requiring a reply, notably from Maya Chen regarding product milestones.\n2. **Immediate Task**: You have ${openTodayCount} task(s) scheduled for today, led by "${todayTasks.value[0]?.title || 'Review team roadmap'}".\n3. **Circadian Rhythm**: Schedule deep focus blocks in the morning and reserve administrative syncs for late afternoon.`
+      citations = [
+        ...todayTasks.value.slice(0, 2).map((t) => `Task: ${t.title}`),
+        ...pendingReplies.value.slice(0, 1).map((m) => `${m.sender}: ${m.subject}`),
+      ]
+      suggestedAction = {
+        label: 'Block 90m Focus Time in Planner',
+        type: 'create_task',
+        payload: { title: 'Deep Work: Product Roadmap & Maya Reply', detail: 'Protected focus block without Slack/Teams interruptions' },
+      }
+    } else if (qLower.includes('reply') || qLower.includes('conversation') || qLower.includes('message')) {
+      if (pendingReplies.value.length > 0) {
+        const topReply = pendingReplies.value[0]
+        responseContent = `You currently have **${pendingReplies.value.length} conversation(s)** requiring your response:\n\n- **${topReply.sender}** (${topReply.source}): "${topReply.subject}"\n  *Excerpt*: "${topReply.preview}"\n\nWould you like me to create an action item to draft a reply?`
+        citations = pendingReplies.value.map((m) => `${m.sender} (${m.source}): ${m.subject}`)
+        suggestedAction = {
+          label: `Draft reply to ${topReply.sender}`,
+          type: 'create_task',
+          payload: { title: `Send reply to ${topReply.sender}`, detail: `Follow up on "${topReply.subject}"` },
+        }
+      } else {
+        responseContent = 'Great news! You have no outstanding conversations waiting for a reply right now. Your inbox queue is clear.'
+      }
+    } else if (qLower.includes('deadline') || qLower.includes('due') || qLower.includes('task')) {
+      const dueTasks = openTasks.value.slice(0, 3)
+      responseContent = `Here are your most urgent upcoming deadlines:\n\n` +
+        dueTasks.map((t) => `- **${t.title}** (Priority: ${t.priority.toUpperCase()}) — Due ${formatDueDate(t.dueDate)}`).join('\n') +
+        `\n\nTotal open tasks across your workspace: **${openTasks.value.length}**.`
+      citations = dueTasks.map((t) => `Task: ${t.title}`)
+      suggestedAction = {
+        label: 'Add high-priority task',
+        type: 'create_task',
+        payload: { title: 'Review upcoming milestone deliverables', detail: 'Audit task completion probability' },
+      }
+    } else if (qLower.includes('summar') || qLower.includes('important')) {
+      const msgs = workspace.messages.filter((m) => !m.archived).slice(0, 3)
+      responseContent = `**Executive Summary of Important Communications**:\n\n` +
+        msgs.map((m) => `• **${m.sender}** on *${m.subject}*: ${m.summary || m.preview}`).join('\n\n') +
+        `\n\n*Overall Assessment*: Communications are aligned. The primary bottleneck is finalizing the Q4 launch dates.`
+      citations = msgs.map((m) => `${m.sender}: ${m.subject}`)
+    } else {
+      const matchedKnowledge = workspace.knowledge.filter((k) =>
+        k.title.toLowerCase().includes(qLower) || k.content.toLowerCase().includes(qLower) || k.tags.some((t) => t.toLowerCase().includes(qLower))
+      )
+      const matchedTasks = workspace.tasks.filter((t) => t.title.toLowerCase().includes(qLower) || t.detail.toLowerCase().includes(qLower))
+      const matchedMsgs = workspace.messages.filter((m) => m.subject.toLowerCase().includes(qLower) || m.preview.toLowerCase().includes(qLower))
+
+      if (matchedKnowledge.length > 0 || matchedTasks.length > 0 || matchedMsgs.length > 0) {
+        responseContent = `I found related entries in your workspace:\n\n`
+        if (matchedKnowledge.length > 0) {
+          responseContent += `**Knowledge Base**: ${matchedKnowledge[0].title} — "${matchedKnowledge[0].content}"\n\n`
+          citations.push(`Doc: ${matchedKnowledge[0].title}`)
+        }
+        if (matchedTasks.length > 0) {
+          responseContent += `**Task**: ${matchedTasks[0].title} (${matchedTasks[0].status})\n\n`
+          citations.push(`Task: ${matchedTasks[0].title}`)
+        }
+        if (matchedMsgs.length > 0) {
+          responseContent += `**Message**: From ${matchedMsgs[0].sender}: "${matchedMsgs[0].subject}"\n\n`
+          citations.push(`${matchedMsgs[0].sender}: ${matchedMsgs[0].subject}`)
+        }
+      } else {
+        responseContent = `I searched your messages, tasks, and knowledge repository for "${query}". I'm grounded to your local workspace data and recommend scheduling this into your daily plan or creating a knowledge note.`
+        suggestedAction = {
+          label: `Create task: ${query.slice(0, 35)}`,
+          type: 'create_task',
+          payload: { title: query.slice(0, 60), detail: 'Created from AI assistant session' },
+        }
+      }
+    }
+
+    workspace.addAssistantMessage({
+      role: 'assistant',
+      content: responseContent,
+      citations: citations.length ? citations : undefined,
+      suggestedAction,
+    })
+    scrollToAssistantChat()
+  }, 450)
+}
+
+function executeAssistantAction(action: NonNullable<AssistantChatMessage['suggestedAction']>) {
+  if (action.type === 'create_task') {
+    workspace.addTask({
+      title: action.payload.title,
+      detail: action.payload.detail || '',
+      dueDate: new Date().toISOString().slice(0, 10),
+      priority: 'high',
+      category: 'Work',
+    })
+    workspace.addAssistantMessage({
+      role: 'assistant',
+      content: `✓ Task **"${action.payload.title}"** has been added to your tasks and daily planner.`,
+    })
+  } else if (action.type === 'create_reminder') {
+    workspace.reminders.push({
+      id: crypto.randomUUID(),
+      title: action.payload.title,
+      time: 'Today · 3:00 PM',
+      completed: false,
+    })
+    workspace.persist()
+    workspace.addAssistantMessage({
+      role: 'assistant',
+      content: `✓ Reminder **"${action.payload.title}"** has been set.`,
+    })
+  }
+  scrollToAssistantChat()
+}
+
+// -------------------------------------------------------------
+// Knowledge Hub State & Methods
+// -------------------------------------------------------------
+const knowledgeSearch = ref('')
+const selectedKnowledgeCategory = ref<string>('All')
+const knowledgeModalOpen = ref(false)
+const newNoteTitle = ref('')
+const newNoteCategory = ref<'Architecture' | 'Guidelines' | 'Decisions' | 'Reference'>('Architecture')
+const newNoteTags = ref('')
+const newNoteContent = ref('')
+
+const filteredKnowledge = computed(() => {
+  return workspace.knowledge.filter((note) => {
+    const query = knowledgeSearch.value.trim().toLowerCase()
+    const matchesQuery = !query ||
+      note.title.toLowerCase().includes(query) ||
+      note.content.toLowerCase().includes(query) ||
+      note.tags.some((tag) => tag.toLowerCase().includes(query))
+    const matchesCategory = selectedKnowledgeCategory.value === 'All' || note.category === selectedKnowledgeCategory.value
+    return matchesQuery && matchesCategory
+  })
+})
+
+function openKnowledgeModal() {
+  newNoteTitle.value = ''
+  newNoteCategory.value = 'Architecture'
+  newNoteTags.value = ''
+  newNoteContent.value = ''
+  knowledgeModalOpen.value = true
+}
+
+function saveKnowledgeNote() {
+  if (!newNoteTitle.value.trim() || !newNoteContent.value.trim()) return
+  const tagList = newNoteTags.value
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean)
+  workspace.addKnowledge({
+    title: newNoteTitle.value.trim(),
+    category: newNoteCategory.value,
+    content: newNoteContent.value.trim(),
+    tags: tagList.length ? tagList : ['General'],
+  })
+  knowledgeModalOpen.value = false
+}
+
+function deleteKnowledgeNote(id: string) {
+  workspace.deleteKnowledge(id)
+}
+
+// -------------------------------------------------------------
+// Spotlight Search & Notifications Popover
+// -------------------------------------------------------------
+const spotlightOpen = ref(false)
+const notificationsOpen = ref(false)
+
+const spotlightResults = computed(() => {
+  const query = searchQuery.value.trim().toLowerCase()
+  if (!query) return { tasks: [], messages: [], knowledge: [] }
+
+  const matchedTasks = workspace.tasks
+    .filter((t) => t.title.toLowerCase().includes(query) || t.detail.toLowerCase().includes(query))
+    .slice(0, 3)
+
+  const matchedMessages = workspace.messages
+    .filter((m) => !m.archived && (m.sender.toLowerCase().includes(query) || m.subject.toLowerCase().includes(query) || m.preview.toLowerCase().includes(query)))
+    .slice(0, 3)
+
+  const matchedKnowledge = workspace.knowledge
+    .filter((k) => k.title.toLowerCase().includes(query) || k.content.toLowerCase().includes(query) || k.tags.some((t) => t.toLowerCase().includes(query)))
+    .slice(0, 3)
+
+  return { tasks: matchedTasks, messages: matchedMessages, knowledge: matchedKnowledge }
+})
+
+const hasSpotlightResults = computed(() => {
+  return searchQuery.value.trim().length > 0 &&
+    (spotlightResults.value.tasks.length > 0 ||
+     spotlightResults.value.messages.length > 0 ||
+     spotlightResults.value.knowledge.length > 0)
+})
+
+function selectSpotlightTask(task: (typeof workspace.tasks)[0]) {
+  searchQuery.value = ''
+  spotlightOpen.value = false
+  navigateTo('tasks')
+}
+
+function selectSpotlightMessage(message: (typeof workspace.messages)[0]) {
+  searchQuery.value = ''
+  spotlightOpen.value = false
+  openMessage(message)
+  navigateTo('inbox')
+}
+
+function selectSpotlightKnowledge(note: (typeof workspace.knowledge)[0]) {
+  searchQuery.value = ''
+  spotlightOpen.value = false
+  selectedKnowledgeCategory.value = 'All'
+  knowledgeSearch.value = note.title
+  navigateTo('knowledge')
+}
+
+function toggleNotifications() {
+  notificationsOpen.value = !notificationsOpen.value
+}
+
+function closeNotifications() {
+  notificationsOpen.value = false
+}
 </script>
 
 <template>
@@ -184,9 +449,105 @@ function navigateTo(name: string) {
         <button class="icon-button mobile-menu-button" type="button" aria-label="Open navigation" @click="mobileMenuOpen = !mobileMenuOpen"><Menu :size="19" /></button>
         <div class="breadcrumb"><span>Workspace</span><ChevronRight :size="14" /><strong>{{ pageTitle }}</strong></div>
         <div class="topbar-actions">
-          <label class="global-search"><Search :size="16" /><input v-model="searchQuery" placeholder="Search anything" aria-label="Search tasks and messages" /><kbd>⌘ K</kbd></label>
-          <button class="icon-button topbar-bell" type="button" aria-label="Notifications"><Bell :size="18" /><i></i></button>
-          <span class="topbar-avatar">AM</span>
+          <div class="global-search-container">
+            <label class="global-search">
+              <Search :size="16" />
+              <input
+                v-model="searchQuery"
+                @focus="spotlightOpen = true"
+                placeholder="Search anything (tasks, messages, notes)..."
+                aria-label="Search tasks, messages, and knowledge"
+              />
+              <kbd>⌘ K</kbd>
+            </label>
+
+            <!-- Spotlight Dropdown -->
+            <div v-if="spotlightOpen && searchQuery.trim()" class="spotlight-dropdown" @mousedown.prevent>
+              <div v-if="hasSpotlightResults">
+                <div v-if="spotlightResults.tasks.length" class="spotlight-group">
+                  <div class="spotlight-group-title">TASKS</div>
+                  <button v-for="t in spotlightResults.tasks" :key="t.id" class="spotlight-item" type="button" @click="selectSpotlightTask(t)">
+                    <ListTodo :size="14" class="spotlight-icon-task" />
+                    <div class="spotlight-item-text">
+                      <strong>{{ t.title }}</strong>
+                      <span>{{ t.category }} · {{ priorityLabel(t.priority) }}</span>
+                    </div>
+                  </button>
+                </div>
+
+                <div v-if="spotlightResults.messages.length" class="spotlight-group">
+                  <div class="spotlight-group-title">MESSAGES</div>
+                  <button v-for="m in spotlightResults.messages" :key="m.id" class="spotlight-item" type="button" @click="selectSpotlightMessage(m)">
+                    <Mail :size="14" class="spotlight-icon-msg" />
+                    <div class="spotlight-item-text">
+                      <strong>{{ m.sender }}: {{ m.subject }}</strong>
+                      <span>{{ m.source }} · {{ relativeTime(m.receivedAt) }}</span>
+                    </div>
+                  </button>
+                </div>
+
+                <div v-if="spotlightResults.knowledge.length" class="spotlight-group">
+                  <div class="spotlight-group-title">KNOWLEDGE</div>
+                  <button v-for="k in spotlightResults.knowledge" :key="k.id" class="spotlight-item" type="button" @click="selectSpotlightKnowledge(k)">
+                    <BookOpen :size="14" class="spotlight-icon-doc" />
+                    <div class="spotlight-item-text">
+                      <strong>{{ k.title }}</strong>
+                      <span>{{ k.category }}</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              <div v-else class="spotlight-empty">
+                No matching tasks, messages, or notes found.
+              </div>
+            </div>
+          </div>
+
+          <div class="notifications-container">
+            <button class="icon-button topbar-bell" type="button" aria-label="Notifications" @click="toggleNotifications">
+              <Bell :size="18" />
+              <i v-if="pendingReplies.length + todayTasks.length > 0"></i>
+            </button>
+
+            <!-- Notifications Popover -->
+            <div v-if="notificationsOpen" class="notifications-popover" @mousedown.prevent>
+              <div class="notif-header">
+                <strong>Notifications</strong>
+                <span class="notif-count">{{ pendingReplies.length + todayTasks.length }} pending</span>
+              </div>
+              <div class="notif-body">
+                <div v-if="pendingReplies.length" class="notif-section">
+                  <div class="notif-section-title">REPLIES NEEDED</div>
+                  <div v-for="m in pendingReplies" :key="m.id" class="notif-item" @click="openMessage(m); navigateTo('inbox'); closeNotifications()">
+                    <span class="sender-avatar small-avatar">{{ m.initials }}</span>
+                    <div class="notif-copy">
+                      <strong>{{ m.sender }}</strong>
+                      <p>{{ m.subject }}</p>
+                      <small>{{ m.source }} · {{ relativeTime(m.receivedAt) }}</small>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="todayTasks.length" class="notif-section">
+                  <div class="notif-section-title">DUE TODAY</div>
+                  <div v-for="t in todayTasks" :key="t.id" class="notif-item" @click="navigateTo('tasks'); closeNotifications()">
+                    <span class="notif-task-dot"></span>
+                    <div class="notif-copy">
+                      <strong>{{ t.title }}</strong>
+                      <p>{{ t.detail || 'Scheduled for today' }}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div v-if="!pendingReplies.length && !todayTasks.length" class="notif-empty">
+                  <CheckCircle2 :size="20" />
+                  <p>All caught up! No urgent alerts.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <span class="topbar-avatar" @click="navigateTo('settings')">AM</span>
         </div>
       </header>
 
@@ -281,6 +642,11 @@ function navigateTo(name: string) {
           <div v-else class="kanban-grid"><section v-for="column in [{ key: 'pending', label: 'To do' }, { key: 'in_progress', label: 'In progress' }, { key: 'completed', label: 'Done' }] as const" :key="column.key" class="kanban-column"><div class="kanban-heading"><span>{{ column.label }}</span><span>{{ visibleTasks.filter((task) => task.status === column.key).length }}</span></div><article v-for="task in visibleTasks.filter((item) => item.status === column.key)" :key="task.id" class="kanban-card"><span class="priority-pill" :class="`priority-${task.priority}`"><i></i>{{ priorityLabel(task.priority) }}</span><strong>{{ task.title }}</strong><span>{{ task.detail }}</span><footer><span>{{ formatDueDate(task.dueDate) }}</span><select :value="task.status" :aria-label="`Move ${task.title}`" @change="workspace.setTaskStatus(task.id, ($event.target as HTMLSelectElement).value as 'pending' | 'in_progress' | 'completed')"><option value="pending">To do</option><option value="in_progress">In progress</option><option value="completed">Done</option></select></footer></article><button class="add-task-inline" type="button" @click="openTaskDialog"><Plus :size="15" /> Add task</button></section></div>
         </section>
 
+        <!-- Daily Planner Section -->
+        <section v-else-if="activeSection === 'daily-planner'" class="inner-page">
+          <DailyPlannerView />
+        </section>
+
         <section v-else-if="activeSection === 'reminders'" class="inner-page">
           <div class="page-heading"><div><p class="eyebrow">AT THE RIGHT MOMENT</p><h1>Reminders<span class="heading-period">.</span></h1><p class="heading-subtitle">Keep the small promises to yourself, too.</p></div><span class="connection-indicator"><i></i> Stored on this device</span></div>
           <section class="content-panel reminder-page-panel"><div class="panel-heading"><div><p class="panel-kicker">UP NEXT</p><h2>Your reminders</h2></div><span class="muted-count">{{ activeReminders.length }} upcoming</span></div><article v-for="reminder in workspace.reminders" :key="reminder.id" class="reminder-page-row" :class="{ 'reminder-done': reminder.completed }"><button class="task-check" :class="{ 'task-check-done': reminder.completed }" type="button" :aria-label="`Toggle ${reminder.title}`" @click="workspace.setReminderCompleted(reminder.id, !reminder.completed)"><Check v-if="reminder.completed" :size="14" /></button><span class="reminder-marker"><CalendarDays :size="16" /></span><div><strong>{{ reminder.title }}</strong><span>{{ reminder.time }}</span></div><span v-if="reminder.completed" class="completed-label">Completed</span><button v-else class="quiet-icon" type="button" title="Snooze reminder" @click="reminder.time = 'Tomorrow · 9:00 AM'; workspace.persist()"><Clock3 :size="17" /></button></article><div v-if="!workspace.reminders.length" class="empty-state"><Bell :size="24" /><strong>No reminders yet</strong><span>Reminders you create will be collected here.</span></div><div class="reminder-note"><ShieldCheck :size="16" /> Reminder delivery is not enabled in this preview.</div></section>
@@ -291,14 +657,183 @@ function navigateTo(name: string) {
           <div class="followup-layout"><section class="content-panel followup-panel"><div class="panel-heading"><div><p class="panel-kicker">REPLY TRACKER</p><h2>Needs your attention</h2></div><span class="muted-count">{{ pendingReplies.length }} conversations</span></div><button v-for="message in pendingReplies" :key="message.id" class="followup-row" type="button" @click="navigateTo('inbox'); selectedMessageId = message.id"><span class="sender-avatar">{{ message.initials }}</span><span class="followup-copy"><strong>{{ message.sender }}</strong><b>{{ message.subject }}</b><span>{{ message.preview }}</span><small>{{ message.source }} · {{ relativeTime(message.receivedAt) }}</small></span><span class="followup-status"><span class="reply-needed">Needs reply</span><ChevronRight :size="17" /></span></button><div v-if="!pendingReplies.length" class="empty-state"><Send :size="22" /><strong>You’re all caught up</strong><span>Messages requiring a reply will appear here.</span></div></section><aside class="followup-aside"><span class="aside-icon"><ShieldCheck :size="19" /></span><h3>Your approval comes first</h3><p>Priorio can suggest follow-ups, but it never sends messages on your behalf.</p></aside></div>
         </section>
 
+        <!-- AI Assistant Section -->
         <section v-else-if="activeSection === 'assistant'" class="inner-page assistant-page">
-          <div class="page-heading"><div><p class="eyebrow">THINK CLEARLY</p><h1>AI assistant<span class="heading-period">.</span></h1><p class="heading-subtitle">A grounded assistant for your work and commitments.</p></div><span class="connection-indicator unavailable"><i></i> Not configured</span></div>
-          <div class="assistant-shell"><div class="assistant-welcome"><span class="assistant-orb"><Sparkles :size="24" /></span><p class="panel-kicker">YOUR PERSONAL ASSISTANT</p><h2>What would you like to<br />get clear on?</h2><p>Answers will include references to the messages and tasks they came from.</p></div><div class="prompt-grid"><button v-for="prompt in ['What should I focus on today?', 'Which conversations need a reply?', 'What deadlines are coming up?', 'Summarize my important messages']" :key="prompt" type="button" disabled><span>{{ prompt }}</span><ArrowUpRight :size="15" /></button></div><div class="assistant-input"><input disabled placeholder="AI is unavailable in this preview" aria-label="Ask Priorio" /><button type="button" disabled aria-label="Send message"><Send :size="17" /></button></div><p class="assistant-disclaimer"><ShieldCheck :size="14" /> AI is not configured. No message content is sent to an AI provider.</p></div>
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">THINK CLEARLY</p>
+              <h1>AI assistant<span class="heading-period">.</span></h1>
+              <p class="heading-subtitle">A grounded assistant connected to your tasks, inbox, and knowledge notes.</p>
+            </div>
+            <div class="heading-actions">
+              <span class="connection-indicator live-indicator"><i></i> Grounded Engine Active</span>
+              <button class="button-outline clear-chat-btn" type="button" @click="workspace.clearAssistantChat">
+                <RotateCcw :size="13" /> Reset Chat
+              </button>
+            </div>
+          </div>
+
+          <!-- Quick Suggestion Prompts -->
+          <div class="assistant-prompts-bar">
+            <span class="prompts-bar-title"><Sparkles :size="14" /> Suggested Prompts:</span>
+            <div class="prompts-bar-list">
+              <button
+                v-for="prompt in [
+                  'What should I focus on today?',
+                  'Which conversations need a reply?',
+                  'What deadlines are coming up?',
+                  'Summarize my important messages',
+                  'Plan my deep focus time'
+                ]"
+                :key="prompt"
+                type="button"
+                class="prompt-bar-chip"
+                @click="askPrompt(prompt)"
+              >
+                {{ prompt }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Chat Stream Shell -->
+          <div class="assistant-conversation-container">
+            <div class="chat-stream">
+              <div
+                v-for="msg in workspace.assistantMessages"
+                :key="msg.id"
+                class="chat-bubble-row"
+                :class="{ 'user-row': msg.role === 'user', 'assistant-row': msg.role === 'assistant' }"
+              >
+                <div class="chat-avatar">
+                  <span v-if="msg.role === 'user'">AM</span>
+                  <Sparkles v-else :size="16" />
+                </div>
+                <div class="chat-bubble-content">
+                  <div class="bubble-meta">
+                    <span class="bubble-sender">{{ msg.role === 'user' ? 'You' : 'Priorio Assistant' }}</span>
+                    <span class="bubble-time">{{ msg.timestamp }}</span>
+                  </div>
+                  <div class="bubble-text" style="white-space: pre-wrap;">{{ msg.content }}</div>
+
+                  <!-- Citations Badge List -->
+                  <div v-if="msg.citations && msg.citations.length" class="bubble-citations">
+                    <span class="citations-label">Sources:</span>
+                    <span v-for="(cit, idx) in msg.citations" :key="idx" class="citation-pill">
+                      <FileText :size="11" />
+                      {{ cit }}
+                    </span>
+                  </div>
+
+                  <!-- Executable Action Button -->
+                  <div v-if="msg.suggestedAction" class="bubble-action-box">
+                    <div class="action-info">
+                      <span class="action-tag">RECOMMENDED ACTION</span>
+                      <strong>{{ msg.suggestedAction.label }}</strong>
+                    </div>
+                    <button class="button-primary action-btn" type="button" @click="executeAssistantAction(msg.suggestedAction)">
+                      <Plus :size="13" /> Execute Now
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Thinking Animation -->
+              <div v-if="isAssistantThinking" class="chat-bubble-row assistant-row">
+                <div class="chat-avatar"><Sparkles :size="16" /></div>
+                <div class="chat-bubble-content">
+                  <div class="bubble-meta"><span class="bubble-sender">Priorio Assistant</span></div>
+                  <div class="thinking-dots">
+                    <span></span><span></span><span></span>
+                  </div>
+                </div>
+              </div>
+
+              <div ref="assistantChatEnd"></div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <form class="assistant-chat-input-form" @submit.prevent="sendAssistantMessage">
+              <input
+                v-model="assistantInput"
+                placeholder="Ask about tasks, priorities, messages, or strategy..."
+                aria-label="Ask Priorio Assistant"
+                :disabled="isAssistantThinking"
+              />
+              <button
+                type="submit"
+                class="chat-send-btn"
+                :disabled="!assistantInput.trim() || isAssistantThinking"
+                aria-label="Send query"
+              >
+                <Send :size="16" />
+              </button>
+            </form>
+            <p class="assistant-privacy-footer">
+              <ShieldCheck :size="13" /> Grounded locally in your active tasks, communications, and knowledge base. Zero external LLM leaks.
+            </p>
+          </div>
         </section>
 
-        <section v-else-if="activeSection === 'knowledge'" class="inner-page">
-          <div class="page-heading"><div><p class="eyebrow">KEEP THE IMPORTANT THINGS</p><h1>Knowledge hub<span class="heading-period">.</span></h1><p class="heading-subtitle">A home for notes, decisions, and things worth finding again.</p></div><span class="connection-indicator unavailable"><i></i> Local preview</span></div>
-          <section class="content-panel knowledge-empty"><span class="knowledge-icon"><BookOpen :size="23" /></span><h2>Your knowledge, in one place</h2><p>Save a message or jot down a note to start building your personal reference space.</p><button class="button-outline" type="button" disabled><Plus :size="16" /> New note unavailable</button><span class="privacy-line"><ShieldCheck :size="14" /> Semantic search is not configured in this preview.</span></section>
+        <!-- Knowledge Hub Section -->
+        <section v-else-if="activeSection === 'knowledge'" class="inner-page knowledge-page">
+          <div class="page-heading">
+            <div>
+              <p class="eyebrow">PERSISTENT MEMORY</p>
+              <h1>Knowledge hub<span class="heading-period">.</span></h1>
+              <p class="heading-subtitle">Decisions, architecture notes, and guidelines grounded into your daily assistant.</p>
+            </div>
+            <button class="button-primary" type="button" @click="openKnowledgeModal">
+              <Plus :size="16" /> New note
+            </button>
+          </div>
+
+          <!-- Knowledge Toolbar: Categories & Search -->
+          <div class="knowledge-toolbar">
+            <div class="filter-tabs">
+              <button
+                v-for="cat in ['All', 'Architecture', 'Guidelines', 'Decisions', 'Reference']"
+                :key="cat"
+                type="button"
+                :class="{ 'filter-active': selectedKnowledgeCategory === cat }"
+                @click="selectedKnowledgeCategory = cat"
+              >
+                {{ cat }}
+              </button>
+            </div>
+            <div class="knowledge-search-wrap">
+              <Search :size="15" />
+              <input v-model="knowledgeSearch" placeholder="Filter notes or tags..." />
+            </div>
+          </div>
+
+          <!-- Knowledge Cards Grid -->
+          <div v-if="filteredKnowledge.length" class="knowledge-cards-grid">
+            <article v-for="note in filteredKnowledge" :key="note.id" class="knowledge-card">
+              <div class="k-card-header">
+                <span class="k-cat-badge" :class="`k-cat-${note.category.toLowerCase()}`">{{ note.category }}</span>
+                <button class="quiet-icon k-del-btn" type="button" aria-label="Delete note" @click="deleteKnowledgeNote(note.id)">
+                  <Trash2 :size="15" />
+                </button>
+              </div>
+              <h3 class="k-card-title">{{ note.title }}</h3>
+              <p class="k-card-content">{{ note.content }}</p>
+              <div class="k-card-footer">
+                <div class="k-tags">
+                  <span v-for="tag in note.tags" :key="tag" class="k-tag">#{{ tag }}</span>
+                </div>
+                <span class="k-date">{{ note.updatedAt }}</span>
+              </div>
+            </article>
+          </div>
+
+          <div v-else class="empty-state">
+            <BookOpen :size="24" />
+            <strong>No notes match this filter</strong>
+            <span>Create a new note or adjust your search keywords.</span>
+            <button class="button-outline" type="button" @click="openKnowledgeModal">
+              <Plus :size="15" /> Create a note
+            </button>
+          </div>
         </section>
 
         <section v-else-if="activeSection === 'communication-tools'" class="inner-page">
@@ -336,6 +871,7 @@ function navigateTo(name: string) {
       <button type="button" :class="{ 'mobile-active': activeSection === 'assistant' }" @click="navigateTo('assistant')"><Sparkles :size="19" /><span>AI</span></button>
     </nav>
 
+    <!-- Task Creation Modal -->
     <div v-if="taskDialogOpen" class="modal-backdrop" @click.self="taskDialogOpen = false">
       <form class="task-modal" @submit.prevent="createTask">
         <div class="modal-heading"><div><p class="panel-kicker">MAKE IT HAPPEN</p><h2>New task</h2></div><button class="quiet-icon" type="button" aria-label="Close" @click="taskDialogOpen = false"><X :size="19" /></button></div>
@@ -343,6 +879,33 @@ function navigateTo(name: string) {
         <label class="form-label">Details <span class="optional-label">Optional</span><textarea v-model="taskDetail" rows="3" placeholder="Add a little context"></textarea></label>
         <div class="form-row"><label class="form-label">Due date<input v-model="taskDueDate" type="date" /></label><label class="form-label">Priority<select v-model="taskPriority"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label></div>
         <div class="modal-actions"><button class="button-outline" type="button" @click="taskDialogOpen = false">Cancel</button><button class="button-primary" type="submit"><Plus :size="16" /> Add task</button></div>
+      </form>
+    </div>
+
+    <!-- Knowledge Note Modal -->
+    <div v-if="knowledgeModalOpen" class="modal-backdrop" @click.self="knowledgeModalOpen = false">
+      <form class="task-modal" @submit.prevent="saveKnowledgeNote">
+        <div class="modal-heading">
+          <div><p class="panel-kicker">PRESERVE CONTEXT</p><h2>New knowledge note</h2></div>
+          <button class="quiet-icon" type="button" aria-label="Close" @click="knowledgeModalOpen = false"><X :size="19" /></button>
+        </div>
+        <label class="form-label">Note Title<input v-model="newNoteTitle" autofocus maxlength="120" placeholder="e.g. Q4 Infrastructure Architecture" required /></label>
+        <div class="form-row">
+          <label class="form-label">Category
+            <select v-model="newNoteCategory">
+              <option value="Architecture">Architecture</option>
+              <option value="Guidelines">Guidelines</option>
+              <option value="Decisions">Decisions</option>
+              <option value="Reference">Reference</option>
+            </select>
+          </label>
+          <label class="form-label">Tags (comma separated)<input v-model="newNoteTags" placeholder="e.g. Security, OAuth, AWS" /></label>
+        </div>
+        <label class="form-label">Note Content<textarea v-model="newNoteContent" rows="4" placeholder="Write key decisions, architecture rules, or protocols..." required></textarea></label>
+        <div class="modal-actions">
+          <button class="button-outline" type="button" @click="knowledgeModalOpen = false">Cancel</button>
+          <button class="button-primary" type="submit"><Plus :size="16" /> Save Note</button>
+        </div>
       </form>
     </div>
   </div>

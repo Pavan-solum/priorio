@@ -37,6 +37,36 @@ export interface PriorioReminder {
   completed: boolean
 }
 
+export interface KnowledgeNote {
+  id: string
+  title: string
+  content: string
+  category: 'Architecture' | 'Guidelines' | 'Decisions' | 'Reference'
+  tags: string[]
+  updatedAt: string
+}
+
+export interface AssistantChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  citations?: string[]
+  suggestedAction?: {
+    label: string
+    type: 'create_task' | 'create_reminder'
+    payload: { title: string; detail?: string }
+  }
+}
+
+export interface WorkspaceData {
+  tasks: PriorioTask[]
+  messages: InboxMessage[]
+  reminders: PriorioReminder[]
+  knowledge: KnowledgeNote[]
+  assistantMessages: AssistantChatMessage[]
+}
+
 const today = new Date()
 const dateOffset = (offset: number) => {
   const date = new Date(today)
@@ -45,7 +75,7 @@ const dateOffset = (offset: number) => {
 }
 const dateTimeOffset = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString()
 
-const previewData = {
+const previewData: WorkspaceData = {
   tasks: [
     { id: 'task-1', title: 'Share the Q4 hiring plan', detail: 'Finalize headcount notes with the leadership team.', dueDate: dateOffset(0), priority: 'high' as Priority, status: 'in_progress' as TaskStatus, category: 'Work' },
     { id: 'task-2', title: 'Review Maya’s proposal', detail: 'Add feedback to the product brief before the review.', dueDate: dateOffset(0), priority: 'medium' as Priority, status: 'pending' as TaskStatus, category: 'Work' },
@@ -64,10 +94,52 @@ const previewData = {
     { id: 'reminder-2', title: 'Pay internet bill', time: 'Today · 6:00 PM', completed: false },
     { id: 'reminder-3', title: 'Pick up groceries', time: 'Tomorrow · 5:30 PM', completed: false },
   ],
+  knowledge: [
+    {
+      id: 'k-1',
+      title: 'Q4 Product Strategy & Objectives',
+      content: 'Primary focus: unify fragmented communications into single calm action stream. Target 95% automated extraction accuracy for Teams and Outlook.',
+      category: 'Decisions' as const,
+      tags: ['Product', 'Strategy', 'Q4'],
+      updatedAt: '2 days ago',
+    },
+    {
+      id: 'k-2',
+      title: 'Engineering Review Standards',
+      content: 'All API routes must enforce workspace tenant isolation, use parameterized Prisma queries, and include AES-256 OAuth token encryption.',
+      category: 'Guidelines' as const,
+      tags: ['Engineering', 'Security', 'Best Practices'],
+      updatedAt: 'Yesterday',
+    },
+    {
+      id: 'k-3',
+      title: 'WhatsApp Privacy Boundary Policy',
+      content: 'Zero cloud ingestion of WhatsApp chat history. Only Android Notification Listener previews explicitly granted on device are processed locally.',
+      category: 'Architecture' as const,
+      tags: ['Privacy', 'Mobile', 'Compliance'],
+      updatedAt: '3 days ago',
+    },
+    {
+      id: 'k-4',
+      title: 'Client Follow-up Protocol',
+      content: 'Proposals sent to partners must be followed up within 48 business hours. Tag critical reply threads and sync calendar reminders.',
+      category: 'Reference' as const,
+      tags: ['Operations', 'Client Relations'],
+      updatedAt: 'Just now',
+    },
+  ],
+  assistantMessages: [
+    {
+      id: 'msg-init',
+      role: 'assistant' as const,
+      content: "Hello Alex! I am your Priorio Assistant. I've analyzed your messages and tasks for today. You have **1 high-priority reply** requested by Maya Chen and **2 tasks due today**. How can I help you?",
+      timestamp: 'Today · 9:00 AM',
+      citations: ['Maya Chen: Re: Product launch timeline', 'Share the Q4 hiring plan'],
+    },
+  ],
 }
 
-const storageKey = 'priorio-preview-v1'
-type WorkspaceData = typeof previewData
+const storageKey = 'priorio-preview-v2'
 
 function readWorkspace(): WorkspaceData {
   try {
@@ -82,7 +154,13 @@ export const useWorkspaceStore = defineStore('workspace', {
   state: () => readWorkspace(),
   actions: {
     persist() {
-      localStorage.setItem(storageKey, JSON.stringify({ tasks: this.tasks, messages: this.messages, reminders: this.reminders }))
+      localStorage.setItem(storageKey, JSON.stringify({
+        tasks: this.tasks,
+        messages: this.messages,
+        reminders: this.reminders,
+        knowledge: this.knowledge,
+        assistantMessages: this.assistantMessages,
+      }))
     },
     addTask(task: Omit<PriorioTask, 'id' | 'status'>) {
       this.tasks.unshift({ ...task, id: crypto.randomUUID(), status: 'pending' })
@@ -113,10 +191,38 @@ export const useWorkspaceStore = defineStore('workspace', {
       if (reminder) reminder.completed = completed
       this.persist()
     },
+    addKnowledge(note: Omit<KnowledgeNote, 'id' | 'updatedAt'>) {
+      this.knowledge.unshift({
+        ...note,
+        id: crypto.randomUUID(),
+        updatedAt: 'Just now',
+      })
+      this.persist()
+    },
+    deleteKnowledge(id: string) {
+      this.knowledge = this.knowledge.filter((k) => k.id !== id)
+      this.persist()
+    },
+    addAssistantMessage(msg: Omit<AssistantChatMessage, 'id' | 'timestamp'>) {
+      const now = new Date()
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      this.assistantMessages.push({
+        ...msg,
+        id: crypto.randomUUID(),
+        timestamp: `Today · ${timeStr}`,
+      })
+      this.persist()
+    },
+    clearAssistantChat() {
+      this.assistantMessages = structuredClone(previewData.assistantMessages)
+      this.persist()
+    },
     resetPreview() {
       this.tasks = structuredClone(previewData.tasks)
       this.messages = structuredClone(previewData.messages)
       this.reminders = structuredClone(previewData.reminders)
+      this.knowledge = structuredClone(previewData.knowledge)
+      this.assistantMessages = structuredClone(previewData.assistantMessages)
       this.persist()
     },
   },
