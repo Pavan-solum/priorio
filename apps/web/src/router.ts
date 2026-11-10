@@ -1,9 +1,13 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import WorkspaceView from './views/WorkspaceView.vue'
+import LoginView from './views/LoginView.vue'
+import { useAuthStore } from './stores/authStore'
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    { path: '/login', name: 'login', component: LoginView, meta: { title: 'Sign In', public: true } },
+    { path: '/register', name: 'register', component: LoginView, meta: { title: 'Create Account', public: true } },
     { path: '/', name: 'today', component: WorkspaceView, meta: { title: 'Today' } },
     { path: '/inbox', name: 'inbox', component: WorkspaceView, meta: { title: 'Smart inbox' } },
     { path: '/tasks', name: 'tasks', component: WorkspaceView, meta: { title: 'My tasks' } },
@@ -17,6 +21,19 @@ const router = createRouter({
     { path: '/settings', name: 'settings', component: WorkspaceView, meta: { title: 'Settings' } },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
+})
+
+router.beforeEach((to, _from, next) => {
+  const authStore = useAuthStore()
+  const isPublic = to.meta.public === true
+
+  if (!isPublic && !authStore.isAuthenticated) {
+    next({ name: 'login', query: { redirect: to.fullPath } })
+  } else if ((to.name === 'login' || to.name === 'register') && authStore.isAuthenticated) {
+    next({ name: 'today' })
+  } else {
+    next()
+  }
 })
 
 export default router

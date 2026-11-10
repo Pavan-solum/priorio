@@ -6,15 +6,17 @@ import {
   Check, CheckCircle2, CheckCheck, ChevronDown, ChevronRight, CircleHelp, Clock3,
   Command, ExternalLink, FileText, Filter, Inbox, LayoutDashboard, ListTodo,
   Mail, Menu, MessageCircle, MessageSquare, MoreHorizontal, Plus, RotateCcw,
-  Search, Send, Settings2, ShieldCheck, Sparkles, Star, Tag, Trash2, X,
+  Search, Send, Settings2, ShieldCheck, Sparkles, Star, Tag, Trash2, X, LogOut,
 } from 'lucide-vue-next'
 import { useWorkspaceStore, type InboxMessage, type Priority, type AssistantChatMessage } from '../stores/workspace'
+import { useAuthStore } from '../stores/authStore'
 import CommunicationToolsView from './CommunicationToolsView.vue'
 import DailyPlannerView from './DailyPlannerView.vue'
 
 const route = useRoute()
 const router = useRouter()
 const workspace = useWorkspaceStore()
+const authStore = useAuthStore()
 const activeSection = computed(() => String(route.name ?? 'today'))
 const searchQuery = ref('')
 const inboxFilter = ref('All')
@@ -126,6 +128,11 @@ function formatDueDate(value: string) {
 function navigateTo(name: string) {
   router.push({ name })
   mobileMenuOpen.value = false
+}
+
+function handleSignOut() {
+  authStore.logout()
+  router.push({ name: 'login' })
 }
 
 // -------------------------------------------------------------
@@ -400,8 +407,8 @@ function closeNotifications() {
       </RouterLink>
 
       <button class="workspace-switcher" type="button">
-        <span class="workspace-avatar">A</span>
-        <span class="workspace-name"><strong>Alex’s workspace</strong><small>Personal</small></span>
+        <span class="workspace-avatar">{{ authStore.userInitials[0] }}</span>
+        <span class="workspace-name"><strong>{{ authStore.currentWorkspaceName }}</strong><small>Personal</small></span>
         <ChevronDown :size="15" />
       </button>
 
@@ -435,8 +442,8 @@ function closeNotifications() {
       <div class="sidebar-bottom">
         <div class="preview-note"><span class="preview-dot"></span><span>Preview workspace</span></div>
         <button class="profile-button" type="button" @click="navigateTo('settings')">
-          <span class="profile-avatar">AM</span>
-          <span class="profile-copy"><strong>Alex Morgan</strong><small>Personal account</small></span>
+          <span class="profile-avatar">{{ authStore.userInitials }}</span>
+          <span class="profile-copy"><strong>{{ authStore.user?.displayName || 'Alex Morgan' }}</strong><small>{{ authStore.user?.email || 'Personal account' }}</small></span>
           <MoreHorizontal :size="18" />
         </button>
       </div>
@@ -547,14 +554,14 @@ function closeNotifications() {
             </div>
           </div>
 
-          <span class="topbar-avatar" @click="navigateTo('settings')">AM</span>
+          <span class="topbar-avatar" @click="navigateTo('settings')">{{ authStore.userInitials }}</span>
         </div>
       </header>
 
       <div class="page-content">
         <section v-if="activeSection === 'today'" class="dashboard-page">
           <div class="page-heading dashboard-heading">
-            <div><p class="eyebrow">{{ todayLabel }}</p><h1>{{ greeting }}, Alex<span class="heading-period">.</span></h1><p class="heading-subtitle">Here’s what deserves your attention today.</p></div>
+            <div><p class="eyebrow">{{ todayLabel }}</p><h1>{{ greeting }}, {{ authStore.user?.displayName?.split(' ')[0] || 'Alex' }}<span class="heading-period">.</span></h1><p class="heading-subtitle">Here’s what deserves your attention today.</p></div>
             <button class="button-primary" type="button" @click="openTaskDialog"><Plus :size="17" /> New task</button>
           </div>
 
@@ -861,7 +868,33 @@ function closeNotifications() {
 
         <section v-else class="inner-page">
           <div class="page-heading"><div><p class="eyebrow">YOUR PREFERENCES</p><h1>Settings<span class="heading-period">.</span></h1><p class="heading-subtitle">Your account and privacy controls.</p></div></div>
-          <section class="content-panel settings-panel"><div class="settings-section"><div><h2>Profile</h2><p>Personal workspace profile.</p></div><div class="settings-value"><span class="profile-avatar">AM</span><span><strong>Alex Morgan</strong><small>Local preview account</small></span></div></div><div class="settings-section"><div><h2>Timezone</h2><p>Dates are shown in your device timezone.</p></div><span class="settings-value plain-value">{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</span></div><div class="settings-section"><div><h2>Data and privacy</h2><p>Preview data is stored in this browser only.</p></div><span class="privacy-status"><ShieldCheck :size="15" /> On this device</span></div><div class="settings-section reset-section"><div><h2>Reset preview workspace</h2><p>Restore the example tasks, messages, and reminders.</p></div><button class="button-outline" type="button" @click="workspace.resetPreview">Reset preview data</button></div></section>
+          <section class="content-panel settings-panel">
+            <div class="settings-section">
+              <div><h2>Profile</h2><p>Personal workspace profile.</p></div>
+              <div class="settings-value">
+                <span class="profile-avatar">{{ authStore.userInitials }}</span>
+                <span><strong>{{ authStore.user?.displayName || 'Alex Morgan' }}</strong><small>{{ authStore.user?.email || 'Local preview account' }}</small></span>
+              </div>
+            </div>
+            <div class="settings-section">
+              <div><h2>Timezone</h2><p>Dates are shown in your device timezone.</p></div>
+              <span class="settings-value plain-value">{{ Intl.DateTimeFormat().resolvedOptions().timeZone }}</span>
+            </div>
+            <div class="settings-section">
+              <div><h2>Data and privacy</h2><p>Preview data is stored in this browser only.</p></div>
+              <span class="privacy-status"><ShieldCheck :size="15" /> On this device</span>
+            </div>
+            <div class="settings-section">
+              <div><h2>Account Session</h2><p>Sign out of this session or switch accounts.</p></div>
+              <button class="button-outline" type="button" @click="handleSignOut">
+                <LogOut :size="15" /> Sign Out
+              </button>
+            </div>
+            <div class="settings-section reset-section">
+              <div><h2>Reset preview workspace</h2><p>Restore the example tasks, messages, and reminders.</p></div>
+              <button class="button-outline" type="button" @click="workspace.resetPreview">Reset preview data</button>
+            </div>
+          </section>
         </section>
       </div>
     </main>
